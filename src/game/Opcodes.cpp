@@ -1,23 +1,20 @@
 /*
- * Copyright (C) 2005-2008 MaNGOS <http://www.mangosproject.org/>
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
- * Copyright (C) 2008 Trinity <http://www.trinitycore.org/>
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * Copyright (C) 2010 Oregon <http://www.oregoncore.com/>
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "Opcodes.h"
@@ -769,7 +766,7 @@ OpcodeHandler opcodeTable[NUM_MSG_TYPES] =
     /*0x2E4*/ { "SMSG_AREA_SPIRIT_HEALER_TIME",     STATUS_NEVER,    &WorldSession::Handle_ServerSide               },
     /*0x2E5*/ { "CMSG_GM_UNTEACH",                  STATUS_NEVER,    &WorldSession::Handle_NULL                     },
     /*0x2E6*/ { "SMSG_WARDEN_DATA",                 STATUS_NEVER,    &WorldSession::Handle_ServerSide               },
-    /*0x2E7*/ { "CMSG_WARDEN_DATA",                 STATUS_LOGGEDIN, &WorldSession::HandleWardenDataOpcode          },
+    /*0x2E7*/ { "CMSG_WARDEN_DATA",                 STATUS_AUTHED,   &WorldSession::HandleWardenDataOpcode          },
     /*0x2E8*/ { "SMSG_GROUP_JOINED_BATTLEGROUND",   STATUS_NEVER,    &WorldSession::Handle_ServerSide               },
     /*0x2E9*/ { "MSG_BATTLEGROUND_PLAYER_POSITIONS",STATUS_LOGGEDIN, &WorldSession::HandleBattleGroundPlayerPositionsOpcode},
     /*0x2EA*/ { "CMSG_PET_STOP_ATTACK",             STATUS_NEVER,    &WorldSession::Handle_NULL                     },

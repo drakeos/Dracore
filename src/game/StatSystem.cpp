@@ -1,23 +1,20 @@
 /*
- * Copyright (C) 2005-2008 MaNGOS <http://www.mangosproject.org/>
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
- * Copyright (C) 2008 Trinity <http://www.trinitycore.org/>
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * Copyright (C) 2010 Oregon <http://www.oregoncore.com/>
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "Unit.h"
@@ -161,6 +158,10 @@ void Player::UpdateArmor()
     }
 
     value *= GetModifierValue(unitMod, TOTAL_PCT);
+
+    // Druid Enrage armor reduction
+    if (HasAura(5229,0))
+        value -= (m_form == FORM_DIREBEAR) ? 0.16*value : 0.27*value;
 
     SetArmor(int32(value));
 
@@ -403,7 +404,7 @@ void Player::CalculateMinMaxDamage(WeaponAttackType attType, bool normalized, fl
         weapon_maxdamage += GetAmmoDPS() * att_speed;
     }
 
-    if(attType == BASE_ATTACK)
+    if (attType == BASE_ATTACK)
     {
         int32 speed_mod = GetTotalAuraModifier(SPELL_AURA_MOD_ATTACKSPEED);
         base_pct *= 100.0f/(100.0f+float(speed_mod/2));
@@ -821,7 +822,7 @@ void Creature::UpdateDamagePhysical(WeaponAttackType attType)
 ########                         ########
 #######################################*/
 
-bool Pet::UpdateStats(Stats stat)
+bool Guardian::UpdateStats(Stats stat)
 {
     if (stat > STAT_SPIRIT)
         return false;
@@ -832,11 +833,11 @@ bool Pet::UpdateStats(Stats stat)
     Unit *owner = GetOwner();
     if (stat == STAT_STAMINA)
     {
-        if (owner && (getPetType() == HUNTER_PET || owner->getClass() == CLASS_WARLOCK))
+        if (owner && (isHunterPet() || owner->getClass() == CLASS_WARLOCK))
             value += float(owner->GetStat(stat)) * 0.3f;
     }
                                                             //warlock's and mage's pets gain 30% of owner's intellect
-    else if (stat == STAT_INTELLECT && getPetType() == SUMMON_PET)
+    else if (stat == STAT_INTELLECT && isPet())
     {
         if (owner && (owner->getClass() == CLASS_WARLOCK || owner->getClass() == CLASS_MAGE))
             value += float(owner->GetStat(stat)) * 0.3f;
@@ -858,7 +859,7 @@ bool Pet::UpdateStats(Stats stat)
     return true;
 }
 
-bool Pet::UpdateAllStats()
+bool Guardian::UpdateAllStats()
 {
     for (int i = STAT_STRENGTH; i < MAX_STATS; ++i)
         UpdateStats(Stats(i));
@@ -872,7 +873,7 @@ bool Pet::UpdateAllStats()
     return true;
 }
 
-void Pet::UpdateResistances(uint32 school)
+void Guardian::UpdateResistances(uint32 school)
 {
     if (school > SPELL_SCHOOL_NORMAL)
     {
@@ -880,7 +881,7 @@ void Pet::UpdateResistances(uint32 school)
 
         Unit *owner = GetOwner();
         // hunter and warlock pets gain 40% of owner's resistance
-        if (owner && (getPetType() == HUNTER_PET || (getPetType() == SUMMON_PET && owner->getClass() == CLASS_WARLOCK)))
+        if (owner && (isHunterPet() || (isPet() && owner->getClass() == CLASS_WARLOCK)))
             value += float(owner->GetResistance(SpellSchools(school))) * 0.4f;
 
         SetResistance(SpellSchools(school), int32(value));
@@ -889,7 +890,7 @@ void Pet::UpdateResistances(uint32 school)
         UpdateArmor();
 }
 
-void Pet::UpdateArmor()
+void Guardian::UpdateArmor()
 {
     float value = 0.0f;
     float bonus_armor = 0.0f;
@@ -897,7 +898,7 @@ void Pet::UpdateArmor()
 
     Unit *owner = GetOwner();
     // hunter and warlock pets gain 35% of owner's armor value
-    if (owner && (getPetType() == HUNTER_PET || (getPetType() == SUMMON_PET && owner->getClass() == CLASS_WARLOCK)))
+    if (owner && (isHunterPet() || (isPet() && owner->getClass() == CLASS_WARLOCK)))
         bonus_armor = 0.35f * float(owner->GetArmor());
 
     value  = GetModifierValue(unitMod, BASE_VALUE);
@@ -909,7 +910,7 @@ void Pet::UpdateArmor()
     SetArmor(int32(value));
 }
 
-void Pet::UpdateMaxHealth()
+void Guardian::UpdateMaxHealth()
 {
     UnitMods unitMod = UNIT_MOD_HEALTH;
     float stamina = GetStat(STAT_STAMINA) - GetCreateStat(STAT_STAMINA);
@@ -922,7 +923,7 @@ void Pet::UpdateMaxHealth()
     SetMaxHealth((uint32)value);
 }
 
-void Pet::UpdateMaxPower(Powers power)
+void Guardian::UpdateMaxPower(Powers power)
 {
     UnitMods unitMod = UnitMods(UNIT_MOD_POWER_START + power);
 
@@ -936,7 +937,7 @@ void Pet::UpdateMaxPower(Powers power)
     SetMaxPower(power, uint32(value));
 }
 
-void Pet::UpdateAttackPowerAndDamage(bool ranged)
+void Guardian::UpdateAttackPowerAndDamage(bool ranged)
 {
     if (ranged)
         return;
@@ -953,13 +954,13 @@ void Pet::UpdateAttackPowerAndDamage(bool ranged)
     Unit* owner = GetOwner();
     if (owner && owner->GetTypeId() == TYPEID_PLAYER)
     {
-        if (getPetType() == HUNTER_PET)                      //hunter pets benefit from owner's attack power
+        if (isHunterPet())                      //hunter pets benefit from owner's attack power
         {
             bonusAP = owner->GetTotalAttackPowerValue(RANGED_ATTACK) * 0.22f;
             SetBonusDamage(int32(owner->GetTotalAttackPowerValue(RANGED_ATTACK) * 0.125f));
         }
         //demons benefit from warlocks shadow or fire damage
-        else if (getPetType() == SUMMON_PET && owner->getClass() == CLASS_WARLOCK)
+        else if (isPet() && owner->getClass() == CLASS_WARLOCK)
         {
             int32 fire  = int32(owner->GetUInt32Value(PLAYER_FIELD_MOD_DAMAGE_DONE_POS + SPELL_SCHOOL_FIRE)) - owner->GetUInt32Value(PLAYER_FIELD_MOD_DAMAGE_DONE_NEG + SPELL_SCHOOL_FIRE);
             int32 shadow = int32(owner->GetUInt32Value(PLAYER_FIELD_MOD_DAMAGE_DONE_POS + SPELL_SCHOOL_SHADOW)) - owner->GetUInt32Value(PLAYER_FIELD_MOD_DAMAGE_DONE_NEG + SPELL_SCHOOL_SHADOW);
@@ -970,7 +971,7 @@ void Pet::UpdateAttackPowerAndDamage(bool ranged)
             bonusAP = maximum * 0.57f;
         }
         //water elementals benefit from mage's frost damage
-        else if (getPetType() == SUMMON_PET && owner->getClass() == CLASS_MAGE)
+        else if (GetEntry() == 510 && owner->getClass() == CLASS_MAGE)
         {
             int32 frost = int32(owner->GetUInt32Value(PLAYER_FIELD_MOD_DAMAGE_DONE_POS + SPELL_SCHOOL_FROST)) - owner->GetUInt32Value(PLAYER_FIELD_MOD_DAMAGE_DONE_NEG + SPELL_SCHOOL_FROST);
             if (frost < 0)
@@ -997,7 +998,7 @@ void Pet::UpdateAttackPowerAndDamage(bool ranged)
     UpdateDamagePhysical(BASE_ATTACK);
 }
 
-void Pet::UpdateDamagePhysical(WeaponAttackType attType)
+void Guardian::UpdateDamagePhysical(WeaponAttackType attType)
 {
     if (attType > BASE_ATTACK)
         return;
@@ -1053,9 +1054,9 @@ void Pet::UpdateDamagePhysical(WeaponAttackType attType)
     float maxdamage = ((base_value + weapon_maxdamage) * base_pct + total_value) * total_pct;
 
     //  Pet's base damage changes depending on happiness
-    if (getPetType() == HUNTER_PET && attType == BASE_ATTACK)
+    if (isHunterPet() && attType == BASE_ATTACK)
     {
-        switch(GetHappinessState())
+        switch(ToPet()->GetHappinessState())
         {
             case HAPPY:
                 // 125% of normal damage

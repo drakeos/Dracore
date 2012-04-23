@@ -1,28 +1,30 @@
-/* Copyright (C) 2006 - 2008 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+/*
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2006-2012 ScriptDev2 <http://www.scriptdev2.com/>
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 /* ScriptData
 SDName: Blades_Edge_Mountains
 SD%Complete: 90
-SDComment: Quest support: 10503, 10504, 10556, 10609, 10682, 10980, 10512. Ogri'la->Skettis Flight. (npc_daranelle needs bit more work before consider complete)
+SDComment: Quest support: 10556, 10609, 10682, 10980, 10512. Ogri'la->Skettis Flight. (npc_daranelle needs bit more work before consider complete)
 SDCategory: Blade's Edge Mountains
 EndScriptData */
 
 /* ContentData
-mobs_bladespire_ogre
 mobs_nether_drake
 npc_daranelle
 npc_overseer_nuaar
@@ -32,34 +34,6 @@ npc_bloodmaul_brutebane
 EndContentData */
 
 #include "ScriptPCH.h"
-
-/*######
-## mobs_bladespire_ogre
-######*/
-
-//TODO: add support for quest 10512 + creature abilities
-struct mobs_bladespire_ogreAI : public ScriptedAI
-{
-    mobs_bladespire_ogreAI(Creature *c) : ScriptedAI(c) {}
-
-    void Reset()
-    {
-    }
-
-    void EnterCombat(Unit* who)
-    {
-    }
-
-    void JustDied(Unit* Killer)
-    {
-        if (Killer->GetTypeId() == TYPEID_PLAYER)
-            CAST_PLR(Killer)->KilledMonsterCredit(19995, me->GetGUID());
-    }
-};
-CreatureAI* GetAI_mobs_bladespire_ogre(Creature* pCreature)
-{
-    return new mobs_bladespire_ogreAI (pCreature);
-}
 
 /*######
 ## mobs_nether_drake
@@ -450,14 +424,40 @@ CreatureAI* GetAI_npc_ogre_brute(Creature* pCreature)
     return new npc_ogre_bruteAI(pCreature);
 }
 
+/*#########
+# go_thunderspike
+# UPDATE `gameobject_template` SET `ScriptName` = "go_thunderspike" WHERE `entry` = 184729;
+#########*/
+
+#define Q_THE_THUNDERSPIKE 10526
+#define GOR_GRIMGUT_ENTRY  21319
+
+bool GOUse_go_thunderspike(Player *player, GameObject* _GO)
+{
+    if (player->GetQuestStatus(Q_THE_THUNDERSPIKE) == QUEST_STATUS_INCOMPLETE)
+    {
+        // to prevent spawn spam :)
+        if (Creature *pGor = GetClosestCreatureWithEntry(player, GOR_GRIMGUT_ENTRY, 50.0f, true))
+        {
+            if (!pGor->getVictim())
+                pGor->AI()->AttackStart(player);
+
+            return false;
+        }
+        
+        Position dest;
+        //player->GetValidPointInAngle(dest, 5.0f, frand(0.0f, 2*M_PI), true);
+        player->GetPosition(&dest);
+        if (Creature* pGor = player->SummonCreature(GOR_GRIMGUT_ENTRY, dest.m_positionX, dest.m_positionY, dest.m_positionZ, 0.0f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 60000))
+            pGor->AI()->AttackStart(player);
+    }
+
+    return false;
+}
+
 void AddSC_blades_edge_mountains()
 {
     Script *newscript;
-
-    newscript = new Script;
-    newscript->Name = "mobs_bladespire_ogre";
-    newscript->GetAI = &GetAI_mobs_bladespire_ogre;
-    newscript->RegisterSelf();
 
     newscript = new Script;
     newscript->Name = "mobs_nether_drake";
@@ -490,5 +490,9 @@ void AddSC_blades_edge_mountains()
     newscript->Name = "npc_ogre_brute";
     newscript->GetAI = &GetAI_npc_ogre_brute;
     newscript->RegisterSelf();
+    
+    newscript = new Script;
+    newscript->Name = "go_thunderspike";
+    newscript->pGOHello = &GOUse_go_thunderspike;
+    newscript->RegisterSelf();
 }
-

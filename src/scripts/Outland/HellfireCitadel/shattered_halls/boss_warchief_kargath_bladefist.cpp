@@ -1,22 +1,25 @@
-/* Copyright (C) 2006 - 2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+/*
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2006-2012 ScriptDev2 <http://www.scriptdev2.com/>
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 /* ScriptData
 SDName: Boss_Warchief_Kargath_Bladefist
-SD%Complete: 90
+SD%Complete: 99
 SDComment:
 SDCategory: Hellfire Citadel, Shattered Halls
 EndScriptData */
@@ -26,6 +29,7 @@ boss_warchief_kargath_bladefist
 EndContentData */
 
 #include "ScriptPCH.h"
+#include "shattered_halls.h"
 
 #define SAY_AGGRO1                      -1540042
 #define SAY_AGGRO2                      -1540043
@@ -82,7 +86,7 @@ struct boss_warchief_kargath_bladefistAI : public ScriptedAI
         me->SetSpeed(MOVE_RUN,2);
         me->RemoveUnitMovementFlag(MOVEFLAG_WALK_MODE);
 
-        summoned = 2;
+        summoned = 1;
         InBlade = false;
         Wait_Timer = 0;
 
@@ -91,11 +95,26 @@ struct boss_warchief_kargath_bladefistAI : public ScriptedAI
         Summon_Assistant_Timer = 15000;
         Assassins_Timer = 5000;
         resetcheck_timer = 5000;
+
+        if (pInstance)
+            pInstance->SetData(DATA_KARGATH, NOT_STARTED);
     }
 
     void EnterCombat(Unit * /*who*/)
     {
         DoScriptText(RAND(SAY_AGGRO1,SAY_AGGRO2,SAY_AGGRO3), me);
+
+        if (pInstance)
+        {
+            pInstance->SetData(DATA_KARGATH, IN_PROGRESS);
+
+            if (pInstance->GetData64(DATA_WARBRINGER))
+            {
+                Creature *pWar = Unit::GetCreature(*me,pInstance->GetData64(DATA_WARBRINGER));
+                if (pWar && pWar->isAlive())
+                    pWar->AI()->AttackStart(me->getVictim());
+            }
+        }
     }
 
     void JustSummoned(Creature *summoned)
@@ -126,6 +145,9 @@ struct boss_warchief_kargath_bladefistAI : public ScriptedAI
     {
         DoScriptText(SAY_DEATH, me);
         removeAdds();
+
+        if (pInstance)
+            pInstance->SetData(DATA_KARGATH, DONE);
     }
 
     void MovementInform(uint32 type, uint32 id)
@@ -256,7 +278,7 @@ struct boss_warchief_kargath_bladefistAI : public ScriptedAI
                         case 2: Summoned = me->SummonCreature(MOB_REAVER_GUARD,AddsEntrance[0],AddsEntrance[1], AddsEntrance[2], 0,TEMPSUMMON_CORPSE_TIMED_DESPAWN,10000); break;
                     }
                 }
-                if (rand()%100 < 20) summoned++;
+                if (rand()%100 < 6) summoned++;
                     Summon_Assistant_Timer = 15000 + (rand()%5000) ;
             } else Summon_Assistant_Timer -= diff;
 

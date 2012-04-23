@@ -1,23 +1,20 @@
 /*
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
- * Copyright (C) 2008-2009 Trinity <http://www.trinitycore.org/>
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * Copyright (C) 2010 Oregon <http://www.oregoncore.com/>
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "UnitAI.h"
@@ -122,69 +119,46 @@ struct TargetDistanceOrder : public std::binary_function<const Unit *, const Uni
 
 Unit* UnitAI::SelectTarget(SelectAggroTarget targetType, uint32 position, float dist, bool playerOnly, int32 aura)
 {
+    const std::list<HostileReference *> &threatlist = me->getThreatManager().getThreatList();
+    std::list<Unit*> targetList;
+
+    for (std::list<HostileReference*>::const_iterator itr = threatlist.begin(); itr != threatlist.end(); ++itr)
+        if (SelectTargetHelper(me, (*itr)->getTarget(), playerOnly, dist, aura))
+            targetList.push_back((*itr)->getTarget());
+ 
+    if (position >= targetList.size())
+        return NULL;
+
     if (targetType == SELECT_TARGET_NEAREST || targetType == SELECT_TARGET_FARTHEST)
-    {
-        std::list<HostileReference*> &m_threatlist = me->getThreatManager().getThreatList();
-        if (position >= m_threatlist.size())
-            return NULL;
-
-        std::list<Unit*> targetList;
-        for (std::list<HostileReference*>::iterator itr = m_threatlist.begin(); itr != m_threatlist.end(); ++itr)
-            if (SelectTargetHelper(me, (*itr)->getTarget(), playerOnly, dist, aura))
-                targetList.push_back((*itr)->getTarget());
-
-        if (position >= targetList.size())
-            return NULL;
-
         targetList.sort(TargetDistanceOrder(me));
 
-        if (targetType == SELECT_TARGET_NEAREST)
-        {
-            std::list<Unit*>::iterator i = targetList.begin();
-            advance(i, position);
-            return *i;
-        }
-        else
-        {
-            std::list<Unit*>::reverse_iterator i = targetList.rbegin();
-            advance(i, position);
-            return *i;
-        }
-    }
-    else
+    switch(targetType)
     {
-        std::list<HostileReference*> m_threatlist = me->getThreatManager().getThreatList();
-        std::list<HostileReference*>::iterator i;
-        while (position < m_threatlist.size())
-        {
-            if (targetType == SELECT_TARGET_BOTTOMAGGRO)
+        case SELECT_TARGET_NEAREST:
+        case SELECT_TARGET_TOPAGGRO:
             {
-                i = m_threatlist.end();
-                advance(i, - (int32)position - 1);
+                std::list<Unit*>::iterator itr = targetList.begin();
+                advance(itr, position);
+                return *itr;
             }
-            else
-            {
-                i = m_threatlist.begin();
-                if (targetType == SELECT_TARGET_TOPAGGRO)
-                    advance(i, position);
-                else // random
-                {
-                    //advance(i, position + rand()%(m_threatlist.size() - position));
-                    //if we use "random, 1", usually we want random except current victim
-                    advance(i, rand()%m_threatlist.size());
-                    if (position && (*i)->getTarget() == me->getVictim())
-                    {
-                        m_threatlist.erase(i);
-                        continue;
-                    }
-                }
-            }
+            break;
 
-            if (SelectTargetHelper(me, (*i)->getTarget(), playerOnly, dist, aura))
-                return (*i)->getTarget();
-            else
-                m_threatlist.erase(i);
-        }
+        case SELECT_TARGET_FARTHEST:
+        case SELECT_TARGET_BOTTOMAGGRO:
+            {
+                std::list<Unit*>::reverse_iterator ritr = targetList.rbegin();
+                advance(ritr, position);
+                return *ritr;
+            }
+            break;
+
+            case SELECT_TARGET_RANDOM:
+            {
+                std::list<Unit*>::iterator itr = targetList.begin();
+                advance(itr, urand(position, targetList.size()-1));
+                return *itr;
+            }
+            break;
     }
 
     return NULL;
@@ -192,47 +166,33 @@ Unit* UnitAI::SelectTarget(SelectAggroTarget targetType, uint32 position, float 
 
 void UnitAI::SelectTargetList(std::list<Unit*> &targetList, uint32 num, SelectAggroTarget targetType, float dist, bool playerOnly, int32 aura)
 {
+    const std::list<HostileReference*> &threatlist = me->getThreatManager().getThreatList();
+    if (threatlist.empty())
+        return;
+
+    for (std::list<HostileReference*>::const_iterator itr = threatlist.begin(); itr != threatlist.end(); ++itr)
+        if (SelectTargetHelper(me, (*itr)->getTarget(), playerOnly, dist, aura))
+            targetList.push_back((*itr)->getTarget());
+
     if (targetType == SELECT_TARGET_NEAREST || targetType == SELECT_TARGET_FARTHEST)
     {
-        std::list<HostileReference*> &m_threatlist = me->getThreatManager().getThreatList();
-        if (m_threatlist.empty())
-            return;
-
-        for (std::list<HostileReference*>::iterator itr = m_threatlist.begin(); itr != m_threatlist.end(); ++itr)
-            if (SelectTargetHelper(me, (*itr)->getTarget(), playerOnly, dist, aura))
-                targetList.push_back((*itr)->getTarget());
-
         targetList.sort(TargetDistanceOrder(me));
-        targetList.resize(num);
-        if (targetType == SELECT_TARGET_FARTHEST)
-            targetList.reverse();
     }
-    else
-    {
-        std::list<HostileReference*> m_threatlist = me->getThreatManager().getThreatList();
-        std::list<HostileReference*>::iterator i;
-        while (!m_threatlist.empty() && num)
-        {
-            if (targetType == SELECT_TARGET_BOTTOMAGGRO)
-            {
-                i = m_threatlist.end();
-                --i;
-            }
-            else
-            {
-                i = m_threatlist.begin();
-                if (targetType == SELECT_TARGET_RANDOM)
-                    advance(i, rand()%m_threatlist.size());
-            }
+ 
+    if (targetType == SELECT_TARGET_FARTHEST || targetType == SELECT_TARGET_BOTTOMAGGRO)
+        targetList.reverse();
 
-            if (SelectTargetHelper(me, (*i)->getTarget(), playerOnly, dist, aura))
-            {
-                targetList.push_back((*i)->getTarget());
-                --num;
-            }
-            m_threatlist.erase(i);
+    if (targetType == SELECT_TARGET_RANDOM)
+    {
+        while (num > targetList.size())
+        {
+            std::list<Unit*>::iterator itr = targetList.begin();
+            advance(itr, urand(0, targetList.size()-1));
+            targetList.erase(itr);
         }
     }
+    else
+        targetList.resize(num);
 }
 
 float UnitAI::DoGetSpellMaxRange(uint32 spellId, bool positive)

@@ -1,27 +1,31 @@
-/* Copyright (C) 2006 - 2008 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+/*
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2006-2012 ScriptDev2 <http://www.scriptdev2.com/>
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 /* ScriptData
 SDName: Boss_Watchkeeper_Gargolmar
-SD%Complete: 80
-SDComment: Missing adds to heal him. Surge should be used on pTarget furthest away, not random.
+SD%Complete: 99
+SDComment: Missing adds to heal him. Should work with ACID.
 SDCategory: Hellfire Citadel, Hellfire Ramparts
 EndScriptData */
 
 #include "ScriptPCH.h"
+#include "hellfire_ramparts.h"
 
 #define SAY_TAUNT               -1543000
 #define SAY_HEAL                -1543001
@@ -42,9 +46,11 @@ struct boss_watchkeeper_gargolmarAI : public ScriptedAI
 {
     boss_watchkeeper_gargolmarAI(Creature *c) : ScriptedAI(c)
     {
+        pInstance = c->GetInstanceData();
         HeroicMode = me->GetMap()->IsHeroic();
     }
 
+    ScriptedInstance* pInstance;
     bool HeroicMode;
 
     uint32 Surge_Timer;
@@ -62,6 +68,9 @@ struct boss_watchkeeper_gargolmarAI : public ScriptedAI
 
         HasTaunted = false;
         YelledForHeal = false;
+
+        if (pInstance)
+            pInstance->SetData(DATA_GARGOLMAR, NOT_STARTED);
     }
 
     void EnterCombat(Unit *who)
@@ -72,6 +81,9 @@ struct boss_watchkeeper_gargolmarAI : public ScriptedAI
             case 1: DoScriptText(SAY_AGGRO_2, me); break;
             case 2: DoScriptText(SAY_AGGRO_3, me); break;
         }
+
+        if (pInstance)
+            pInstance->SetData(DATA_GARGOLMAR, IN_PROGRESS);
     }
 
     void MoveInLineOfSight(Unit* who)
@@ -107,6 +119,9 @@ struct boss_watchkeeper_gargolmarAI : public ScriptedAI
     void JustDied(Unit* Killer)
     {
         DoScriptText(SAY_DIE, me);
+
+        if (pInstance)
+            pInstance->SetData(DATA_GARGOLMAR, DONE);
     }
 
     void UpdateAI(const uint32 diff)

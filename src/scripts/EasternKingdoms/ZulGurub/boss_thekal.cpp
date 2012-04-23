@@ -1,20 +1,20 @@
-/* Copyright (C) 2006 - 2008 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+/*
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2006-2012 ScriptDev2 <http://www.scriptdev2.com/>
  *
- * Copyright (C) 2011 Oregon <http://www.oregoncore.com/>
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 /* ScriptData
@@ -38,27 +38,27 @@ enum Spells
     // High Priest Thekal - Humanoid
     SPELL_MORTALCLEAVE      =   22859,
     SPELL_RESURRECT         =   24173,
-    SPELL_SILENCE           =   23207,
+    SPELL_SILENCE           =   22666,
 
     // High Priest Thekal - Tiger
-    SPELL_FRENZY            =   23342,
+    SPELL_FRENZY            =   8269,
     SPELL_FORCEPUNCH        =   24189,
-    SPELL_CHARGE            =   24408,
-    SPELL_ENRAGE            =   23537,
+    SPELL_CHARGE            =   24193,
+    SPELL_ENRAGE            =   8269,
     SPELL_SUMMONTIGERS      =   24183,
     SPELL_TIGER_FORM        =   24169,
                           
 
     // Zealot Lor'Khan Spells
-    SPELL_SHIELD            =   25020,
+    SPELL_SHIELD            =   20545,
     SPELL_BLOODLUST         =   24185,
     SPELL_GREATERHEAL       =   24208,
-    SPELL_DISARM            =   22691,
+    SPELL_DISARM            =   6713,
 
     // Zealot Zath Spells
     SPELL_SWEEPINGSTRIKES   =   18765,
-    SPELL_SINISTERSTRIKE    =   15667,
-    SPELL_GOUGE             =   24698,
+    SPELL_SINISTERSTRIKE    =   15581,
+    SPELL_GOUGE             =   12540,
     SPELL_KICK              =   15614,
     SPELL_BLIND             =   21060
 };

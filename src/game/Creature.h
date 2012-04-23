@@ -1,23 +1,20 @@
 /*
- * Copyright (C) 2005-2008 MaNGOS <http://www.mangosproject.org/>
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
- * Copyright (C) 2008 Trinity <http://www.trinitycore.org/>
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * Copyright (C) 2010-2011 Oregon <http://www.oregoncore.com/>
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef OREGONCORE_CREATURE_H
@@ -40,7 +37,7 @@ class CreatureAI;
 class Quest;
 class Player;
 class WorldSession;
-class CreatureGroup;
+class CreatureFormation;
 
 enum Gossip_Guard
 {
@@ -125,9 +122,9 @@ enum SummonMask
     SUMMON_MASK_GUARDIAN              = 0x00000004,
     SUMMON_MASK_TOTEM                 = 0x00000008,
     SUMMON_MASK_PET                   = 0x00000010,
-    SUMMON_MASK_PUPPET                = 0x00000040,
-    SUMMON_MASK_HUNTER_PET            = 0x00000080,
-    SUMMON_MASK_CONTROLABLE_GUARDIAN  = 0x00000100,
+    SUMMON_MASK_PUPPET                = 0x00000020,
+    SUMMON_MASK_HUNTER_PET            = 0x00000040,
+    SUMMON_MASK_CONTROLABLE_GUARDIAN  = 0x00000080,
 };
 
 // GCC have alternative #pragma pack(N) syntax and old gcc version not support pack(push,N), also any gcc version not support it at some platform
@@ -442,6 +439,8 @@ class Creature : public Unit, public GridObject<Creature>
         bool isHunterPet() const{ return m_summonMask & SUMMON_MASK_HUNTER_PET; }
         bool isTotem() const    { return m_summonMask & SUMMON_MASK_TOTEM; }
 
+        Pet* ToPet(){ if (isPet()) return reinterpret_cast<Pet*>(this); else return NULL; }
+
         void SetCorpseDelay(uint32 delay) { m_corpseDelay = delay; }
         bool isRacialLeader() const { return GetCreatureInfo()->RacialLeader; }
         bool isCivilian() const { return GetCreatureInfo()->flags_extra & CREATURE_FLAG_EXTRA_CIVILIAN; }
@@ -642,8 +641,12 @@ class Creature : public Unit, public GridObject<Creature>
         void UpdateWaypointID(uint32 wpID){m_waypointID = wpID;}
 
         void SearchFormation();
-        CreatureGroup *GetFormation(){return m_formation;}
-        void SetFormation(CreatureGroup *formation) {m_formation = formation;}
+        CreatureFormation *GetFormation() {return m_formation;}
+        void SetFormation(CreatureFormation *formation) {m_formation = formation;}
+
+        void SearchGroup();
+        CreatureGroup *GetGroup() {return m_group;}
+        void SetGroup(CreatureGroup *group) {m_group = group;}
 
         Unit *SelectVictim();
 
@@ -713,7 +716,9 @@ class Creature : public Unit, public GridObject<Creature>
         uint32 m_path_id;
 
         //Formation var
-        CreatureGroup *m_formation;
+        CreatureFormation *m_formation;
+        //Group var
+        CreatureGroup *m_group;
 
         CreatureInfo const* m_creatureInfo;                 // in heroic mode can different from ObjMgr::GetCreatureTemplate(GetEntry())
 };

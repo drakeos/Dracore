@@ -1,6 +1,5 @@
-# Copyright (C) 2008-2010 Trinity <http://www.trinitycore.org/>
-#
-# Copyright (C) 2009-2010 Oregon <http://www.oregoncore.org/>
+# Copyright (C) 2008-2012 OregonCore <http://www.oregoncore.com/>
+# Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
 #
 # This file is free software; as a special exception the author gives
 # unlimited permission to copy and/or distribute it, with or without
@@ -64,6 +63,7 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/PrecompiledHeaders
   ${ACE_INCLUDE_DIR}
   ${MYSQL_INCLUDE_DIR}
+  ${OPENSSL_INCLUDE_DIR}
 )
 
 add_library(scripts STATIC ${scripts_STAT_SRCS})

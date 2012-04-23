@@ -1,23 +1,20 @@
 /*
- * Copyright (C) 2005-2008 MaNGOS <http://www.mangosproject.org/>
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
- * Copyright (C) 2008 Trinity <http://www.trinitycore.org/>
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * Copyright (C) 2010 Oregon <http://www.oregoncore.com/>
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "Common.h"
@@ -130,7 +127,7 @@ pAuraHandler AuraHandler[TOTAL_AURAS]=
     &Aura::HandleModSpellCritChanceShool,                   // 71 SPELL_AURA_MOD_SPELL_CRIT_CHANCE_SCHOOL
     &Aura::HandleModPowerCostPCT,                           // 72 SPELL_AURA_MOD_POWER_COST_SCHOOL_PCT
     &Aura::HandleModPowerCost,                              // 73 SPELL_AURA_MOD_POWER_COST_SCHOOL
-    &Aura::HandleNoImmediateEffect,                         // 74 SPELL_AURA_REFLECT_SPELLS_SCHOOL  implemented in Unit::SpellHitResult
+    &Aura::HandleAuraReflectSpellSchool,                    // 74 SPELL_AURA_REFLECT_SPELLS_SCHOOL  implemented in Unit::SpellHitResult
     &Aura::HandleNoImmediateEffect,                         // 75 SPELL_AURA_MOD_LANGUAGE
     &Aura::HandleFarSight,                                  // 76 SPELL_AURA_FAR_SIGHT
     &Aura::HandleModMechanicImmunity,                       // 77 SPELL_AURA_MECHANIC_IMMUNITY
@@ -430,6 +427,10 @@ m_periodicTimer(0), m_amplitude(0), m_PeriodicEventId(0), m_AuraDRGroup(DIMINISH
 
     m_isRemovedOnShapeLost = (m_caster_guid == m_target->GetGUID() && m_spellProto->Stances &&
                             !(m_spellProto->AttributesEx2 & 0x80000) && !(m_spellProto->Attributes & 0x10000));
+
+    //  WeakenedSoul       Sweeping Strikes
+    if (GetId() == 6788 || GetId() == 12328)
+        m_isRemovedOnShapeLost = false;
 }
 
 Aura::~Aura()
@@ -1634,13 +1635,6 @@ void Aura::TriggerSpell()
                     }
 //                    // Magic Sucker Device timer
 //                    case 38672: break;
-                    // Rod of Purification - for quest 10839 (Veil Skith: Darkstone of Terokk)
-                    case 38736:
-                    {
-                        if (Unit* caster = GetCaster())
-                            caster->CastSpell(target, trigger_spell_id, true, NULL, this);
-                        return;
-                    }
 //                    // Tomb Guarding Charging
 //                    case 38751: break;
 //                    // Murmur's Touch
@@ -1974,6 +1968,13 @@ void Aura::TriggerSpell()
                 caster->CastCustomSpell(trigger_spell_id, SPELLVALUE_MAX_TARGETS, m_tickNumber / 10 + 1, NULL, true, NULL, this, originalCasterGUID);
                 return;
             }
+            // Rod of Purification - for quest 10839 (Veil Skith: Darkstone of Terokk)
+            case 38736:
+            {
+                if (Unit* caster = GetCaster())
+                    caster->CastSpell(target, trigger_spell_id, true, NULL, this);
+                return;
+            }
         }
     }
     if (!GetSpellMaxRange(sSpellRangeStore.LookupEntry(triggeredSpellInfo->rangeIndex)))
@@ -2081,6 +2082,42 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
                 if (m_target->GetTypeId() == TYPEID_PLAYER)
                     m_target->ToPlayer()->RemoveAmmo();      // not use ammo and not allow use
                 return;
+            case 39246:                                     // Q: The Big Bone Worm
+            {
+                if (!m_target)
+                    return;
+
+                if (Unit* caster = GetCaster())
+                {
+                    if (urand(0,10) > 2)
+                    {
+                        int32 count = urand(0,1) ? 2 : 4;
+                        for(int i = 0; i < count; ++i)
+                            caster->SummonCreature(urand(0,1) ? 22482 : 22483, m_target->GetPositionX(), m_target->GetPositionY(), m_target->GetPositionZ(), m_target->GetOrientation(), TEMPSUMMON_CORPSE_TIMED_DESPAWN, 60000);
+                    }
+                    else
+                        caster->SummonCreature(22038, m_target->GetPositionX(), m_target->GetPositionY(), m_target->GetPositionZ(), m_target->GetOrientation(), TEMPSUMMON_CORPSE_TIMED_DESPAWN, 60000);
+                }
+                return;
+            }
+            case 39238:                                     // Fumping
+            {
+                if (!m_target)
+                    return;
+
+                if (Unit* caster = GetCaster())
+                {
+                    if(urand(0,1) == 0)
+                        caster->SummonCreature(22482, m_target->GetPositionX(), m_target->GetPositionY(), m_target->GetPositionZ(), m_target->GetOrientation(), TEMPSUMMON_CORPSE_TIMED_DESPAWN, 60000);
+                    else
+                    {
+                        caster->SummonCreature(22483, m_target->GetPositionX(), m_target->GetPositionY(), m_target->GetPositionZ(), m_target->GetOrientation(), TEMPSUMMON_CORPSE_TIMED_DESPAWN, 60000);
+                        caster->SummonCreature(22483, m_target->GetPositionX(), m_target->GetPositionY(), m_target->GetPositionZ(), m_target->GetOrientation(), TEMPSUMMON_CORPSE_TIMED_DESPAWN, 60000);
+                        caster->SummonCreature(22483, m_target->GetPositionX(), m_target->GetPositionY(), m_target->GetPositionZ(), m_target->GetOrientation(), TEMPSUMMON_CORPSE_TIMED_DESPAWN, 60000);
+                    }
+                }
+                return;
+            }
         }
 
         // Earth Shield
@@ -3533,14 +3570,10 @@ void Aura::HandleModThreat(bool apply, bool Real)
     if (level_diff > 0)
         m_modifier.m_amount += multiplier * level_diff;
 
-    for (int8 x=0;x < MAX_SPELL_SCHOOL;x++)
-    {
-        if (m_modifier.m_miscvalue & int32(1<<x))
-        {
-            if (m_target->GetTypeId() == TYPEID_PLAYER)
+    if (m_target->GetTypeId() == TYPEID_PLAYER)
+        for (int8 x = 0;x < MAX_SPELL_SCHOOL; x++)
+            if (GetMiscValue() & int32(1 << x))
                 ApplyPercentModFloatVar(m_target->m_threatModifier[x], m_positive ? GetModifierValue() : -GetModifierValue(), apply);
-        }
-    }
 }
 
 void Aura::HandleAuraModTotalThreat(bool apply, bool Real)
@@ -3557,11 +3590,7 @@ void Aura::HandleAuraModTotalThreat(bool apply, bool Real)
     if (!caster || !caster->isAlive())
         return;
 
-    float threatMod = 0.0f;
-    if (apply)
-        threatMod = float(GetModifierValue());
-    else
-        threatMod =  float(-GetModifierValue());
+    float threatMod = apply ? float(GetModifierValue()) : float(-GetModifierValue());
 
     m_target->getHostileRefManager().threatAssist(caster, threatMod);
 }
@@ -3980,6 +4009,10 @@ void Aura::HandlePeriodicEnergize(bool apply, bool /*Real*/)
         m_periodicTimer += m_modifier.periodictime;
 
     m_isPeriodic = apply;
+
+    if (GetId() == 5229)
+        m_target->UpdateArmor();
+
 }
 
 void Aura::HandleAuraPeriodicDummy(bool apply, bool Real)
@@ -6511,6 +6544,25 @@ void Aura::HandleArenaPreparation(bool apply, bool Real)
         m_target->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PREPARATION);
 }
 
+void Aura::HandleAuraReflectSpellSchool(bool apply, bool real)
+{
+    if (!real || !apply)
+        return;
+
+    if (Player *pTarget = m_target->ToPlayer())
+    {
+        if (GetSpellProto()->SpellFamilyName == SPELLFAMILY_MAGE)
+        {
+            // Fire Ward
+            if (GetSpellProto()->SpellFamilyFlags & 0x8)
+                GetModifier()->m_amount += pTarget->HasSpell(11094) ? 10.0f : pTarget->HasSpell(13043) ? 20.0f : 0.0f;
+            // Frost Ward
+            else if (GetSpellProto()->SpellFamilyFlags & 0x80100)
+                GetModifier()->m_amount += pTarget->HasSpell(11189) ? 10.0f : pTarget->HasSpell(28332) ? 20.0f : 0.0f;
+        }
+    }
+}
+
 void Aura::UnregisterSingleCastAura()
 {
     if (IsSingleTarget())
@@ -6527,4 +6579,3 @@ void Aura::UnregisterSingleCastAura()
         m_isSingleTargetAura = false;
     }
 }
-

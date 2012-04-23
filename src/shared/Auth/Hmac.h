@@ -1,9 +1,7 @@
 /*
- * Copyright (C) 2005-2010 MaNGOS <http://getmangos.com/>
- *
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
- *
- * Copyright (C) 2010 Oregon <http://www.oregoncore.com/>
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -34,9 +32,11 @@ class HmacHash
 {
     public:
         HmacHash();
+        HmacHash(uint32 len, uint8 *seed);
         ~HmacHash();
         void UpdateBigNumber(BigNumber *bn);
         void UpdateData(const uint8 *data, int length);
+        void UpdateData(const std::string &str);
         void Initialize();
         void Finalize();
         uint8 *GetDigest() { return m_digest; };

@@ -1,6 +1,5 @@
-# Copyright (C) 2008-2010 Trinity <http://www.trinitycore.org/>
-#
-# Copyright (C) 2009-2010 Oregon <http://www.oregoncore.org/>
+# Copyright (C) 2008-2012 OregonCore <http://www.oregoncore.com/>
+# Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
 #
 # This file is free software; as a special exception the author gives
 # unlimited permission to copy and/or distribute it, with or without
@@ -10,7 +9,7 @@
 # WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
 # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
-if( USE_COREPCH )
+if (USE_COREPCH)
   include_directories(${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
@@ -18,7 +17,7 @@ file(GLOB sources_localdir *.cpp *.h)
 
 # Create game-libary
 
-if( USE_COREPCH AND MSVC )
+if (USE_COREPCH AND MSVC)
   set(game_STAT_SRCS
     PrecompiledHeaders/gamePCH.cpp
     PrecompiledHeaders/gamePCH.h
@@ -38,7 +37,6 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/src/framework
   ${CMAKE_SOURCE_DIR}/src/collision
   ${CMAKE_SOURCE_DIR}/src/shared
-  ${CMAKE_SOURCE_DIR}/src/shared/vmap
   ${CMAKE_SOURCE_DIR}/src/shared/Database
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_SOURCE_DIR}/src/scripts/PrecompiledHeaders
@@ -52,10 +50,10 @@ add_library(game STATIC ${game_STAT_SRCS})
 add_dependencies(game revision.h)
 
 # Generate precompiled header
-if( USE_COREPCH )
-  if(CMAKE_COMPILER_IS_GNUCXX)
+if (USE_COREPCH)
+  if (CMAKE_COMPILER_IS_GNUCXX)
     add_precompiled_header(game ${CMAKE_CURRENT_SOURCE_DIR}/PrecompiledHeaders/gamePCH.h)
-  elseif(MSVC)
+  elseif (MSVC)
     add_native_precompiled_header(game ${CMAKE_CURRENT_SOURCE_DIR}/PrecompiledHeaders/gamePCH)
   endif()
 endif()

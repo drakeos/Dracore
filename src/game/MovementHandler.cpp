@@ -1,23 +1,20 @@
 /*
- * Copyright (C) 2005-2008 MaNGOS <http://www.mangosproject.org/>
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
- * Copyright (C) 2008 Trinity <http://www.trinitycore.org/>
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * Copyright (C) 2010 Oregon  <https://www.oregoncore.com/>
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "Common.h"
@@ -324,21 +321,20 @@ void WorldSession::HandleMovementOpcodes(WorldPacket & recv_data)
     }
 
     /* process position-change */
+    recv_data.put<uint32>(5, getMSTime());                  // offset flags(4) + unk(1)
+    WorldPacket data(opcode, mover->GetPackGUID().size() + recv_data.size());
+    data << mover->GetPackGUID();
+    data.append(recv_data.contents(), recv_data.size());
+    if (mover->isCharmed() && mover->GetCharmer())
+        mover->GetCharmer()->SendMessageToSet(&data, false);
+    else
+        mover->SendMessageToSet(&data, false);
+
+    mover->m_movementInfo = movementInfo;
+    mover->SetPosition(movementInfo.GetPos()->GetPositionX(), movementInfo.GetPos()->GetPositionY(), movementInfo.GetPos()->GetPositionZ(), movementInfo.GetPos()->GetOrientation());
 
     if (plMover)                                            // nothing is charmed, or player charmed
     {
-        recv_data.put<uint32>(5, getMSTime());                  // offset flags(4) + unk(1)
-        WorldPacket data(opcode, mover->GetPackGUID().size() + recv_data.size());
-        data << mover->GetPackGUID();
-        data.append(recv_data.contents(), recv_data.size());
-        if (plMover->isCharmed())
-            plMover->GetCharmer()->SendMessageToSet(&data, false);
-        else
-            mover->SendMessageToSet(&data, false);
-
-        plMover->m_movementInfo = movementInfo;
-        plMover->SetPosition(movementInfo.GetPos()->GetPositionX(), movementInfo.GetPos()->GetPositionY(), movementInfo.GetPos()->GetPositionZ(), movementInfo.GetPos()->GetOrientation());
-
         if (opcode == MSG_MOVE_FALL_LAND || plMover->m_lastFallTime > movementInfo.GetFallTime() || plMover->m_lastFallZ < movementInfo.GetPos()->GetPositionZ())
             plMover->SetFallInformation(movementInfo.GetFallTime(), movementInfo.GetPos()->GetPositionZ());
 
@@ -349,8 +345,6 @@ void WorldSession::HandleMovementOpcodes(WorldPacket & recv_data)
         if (movementInfo.GetPos()->GetPositionZ() < -500.0f)
             plMover->HandleFallUnderMap();
     }
-    else                                                    // creature charmed
-        mover->GetMap()->CreatureRelocation(mover->ToCreature(), movementInfo.GetPos()->GetPositionX(), movementInfo.GetPos()->GetPositionY(), movementInfo.GetPos()->GetPositionZ(), movementInfo.GetPos()->GetOrientation());
 }
 
 void WorldSession::HandleForceSpeedChangeAck(WorldPacket &recv_data)

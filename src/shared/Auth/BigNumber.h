@@ -1,9 +1,7 @@
 /*
- * Copyright (C) 2005-2010 MaNGOS <http://getmangos.com/>
- *
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
- *
- * Copyright (C) 2010 Oregon <http://www.oregoncore.com/>
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -85,7 +83,7 @@ class BigNumber
         struct bignum_st *BN() { return _bn; }
 
         uint32 AsDword();
-        uint8* AsByteArray(int minSize = 0);
+        uint8* AsByteArray(int minSize = 0, bool reverse = true);
         ByteBuffer AsByteBuffer();
         std::vector<uint8> AsByteVector();
 

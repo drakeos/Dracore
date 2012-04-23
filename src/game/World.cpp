@@ -1,23 +1,20 @@
 /*
- * Copyright (C) 2005-2008 MaNGOS <http://www.mangosproject.org/>
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
- * Copyright (C) 2008 Trinity <http://www.trinitycore.org/>
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * Copyright (C) 2010 Oregon <http://www.oregoncore.com/>
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "Common.h"
@@ -59,11 +56,13 @@
 #include "TicketMgr.h"
 #include "Util.h"
 #include "Language.h"
+#include "CreatureFormations.h"
 #include "CreatureGroups.h"
 #include "Transports.h"
 #include "CreatureEventAIMgr.h"
 #include "ScriptMgr.h"
 #include "ProgressBar.h"
+#include "WardenDataStorage.h"
 
 INSTANTIATE_SINGLETON_1(World);
 
@@ -1101,6 +1100,13 @@ void World::LoadConfigSettings(bool reload)
     m_configs[CONFIG_CHATLOG_PUBLIC] = sConfig.GetBoolDefault("ChatLogs.Public", false);
     m_configs[CONFIG_CHATLOG_ADDON] = sConfig.GetBoolDefault("ChatLogs.Addon", false);
     m_configs[CONFIG_CHATLOG_BGROUND] = sConfig.GetBoolDefault("ChatLogs.BattleGround", false);
+    
+    // warden
+    m_configs[CONFIG_WARDEN_ENABLED] = sConfig.GetBoolDefault("Warden.Enabled", false);
+    m_configs[CONFIG_WARDEN_KICK] = sConfig.GetBoolDefault("Warden.Kick", false);
+    m_configs[CONFIG_WARDEN_NUM_CHECKS] = sConfig.GetIntDefault("Warden.NumChecks", 3);
+    m_configs[CONFIG_WARDEN_CLIENT_CHECK_HOLDOFF] = sConfig.GetIntDefault("Warden.ClientCheckHoldOff", 30);
+    m_configs[CONFIG_WARDEN_CLIENT_RESPONSE_DELAY] = sConfig.GetIntDefault("Warden.ClientResponseDelay", 15);
 }
 
 // Initialize the World
@@ -1343,9 +1349,9 @@ void World::SetInitialWorldSettings()
 
     // Load dynamic data tables from the database
     sLog.outString("Loading Item Auctions...");
-    auctionmgr.LoadAuctionItems();
+    sAuctionMgr->LoadAuctionItems();
     sLog.outString("Loading Auctions...");
-    auctionmgr.LoadAuctions();
+    sAuctionMgr->LoadAuctions();
 
     sLog.outString("Loading Guilds...");
     objmgr.LoadGuilds();
@@ -1391,6 +1397,9 @@ void World::SetInitialWorldSettings()
 
     sLog.outString("Loading Creature Formations...");
     formation_mgr.LoadCreatureFormations();
+
+    sLog.outString("Loading Creature Groups...");
+    group_mgr.LoadCreatureGroups();
 
     sLog.outString("Loading GM tickets...");
     ticketmgr.LoadGMTickets();
@@ -1485,6 +1494,10 @@ void World::SetInitialWorldSettings()
     sLog.outString("Starting Game Event system...");
     uint32 nextGameEvent = gameeventmgr.Initialize();
     m_timers[WUPDATE_EVENTS].SetInterval(nextGameEvent);    //depend on next event
+
+    // Load Warden Data
+    sLog.outString("Loading Warden Data..." );
+    WardenDataStorage.Init();
 
     // Initialize Battlegrounds
     sLog.outString("Starting BattleGround System");
@@ -1698,7 +1711,7 @@ void World::Update(time_t diff)
         }
 
         // Handle expired auctions
-        auctionmgr.Update();
+        sAuctionMgr->Update();
     }
 
     // Handle session updates when the timer has passed
@@ -2114,7 +2127,7 @@ bool World::RemoveBanAccount(BanMode mode, std::string nameOrIP)
     {
         uint32 account = 0;
         if (mode == BAN_ACCOUNT)
-            account = accmgr.GetId (nameOrIP);
+            account = sAccountMgr->GetId (nameOrIP);
         else if (mode == BAN_CHARACTER)
             account = objmgr.GetPlayerAccountIdByPlayerName (nameOrIP);
 

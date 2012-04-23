@@ -1,21 +1,20 @@
 /*
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
- * Copyright (C) 2010 Oregon <http://www.oregoncore.com/>
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "Common.h"
@@ -26,7 +25,6 @@
 #include "WorldSession.h"
 #include "Database/DatabaseEnv.h"
 #include "Database/SQLStorage.h"
-#include "Policies/SingletonImp.h"
 #include "DBCStores.h"
 
 #include "AccountMgr.h"
@@ -36,8 +34,6 @@
 #include "Log.h"
 #include "ProgressBar.h"
 #include <vector>
-
-INSTANTIATE_SINGLETON_1(AuctionHouseMgr);
 
 using namespace std;
 
@@ -133,7 +129,7 @@ void AuctionHouseMgr::SendAuctionWonMail(AuctionEntry *auction)
         else
         {
             bidder_accId = objmgr.GetPlayerAccountIdByGUID(bidder_guid);
-            bidder_security = accmgr.GetSecurity(bidder_accId);
+            bidder_security = sAccountMgr->GetSecurity(bidder_accId);
 
             if (bidder_security > SEC_PLAYER) // not do redundant DB requests
             {
@@ -551,22 +547,22 @@ void AuctionHouseObject::Update()
 
         ///- Either cancel the auction if there was no bidder
         if (auction->bidder == 0)
-            auctionmgr.SendAuctionExpiredMail(auction);
+            sAuctionMgr->SendAuctionExpiredMail(auction);
         ///- Or perform the transaction
         else
         {
             //we should send an "item sold" message if the seller is online
             //we send the item to the winner
             //we send the money to the seller
-            auctionmgr.SendAuctionSuccessfulMail(auction);
-            auctionmgr.SendAuctionWonMail(auction);
+            sAuctionMgr->SendAuctionSuccessfulMail(auction);
+            sAuctionMgr->SendAuctionWonMail(auction);
         }
 
         ///- In any case clear the auction
         CharacterDatabase.BeginTransaction();
         auction->DeleteFromDB();
         uint32 item_template = auction->item_template;
-        auctionmgr.RemoveAItem(auction->item_guidlow);
+        sAuctionMgr->RemoveAItem(auction->item_guidlow);
         RemoveAuction(auction, item_template);
         CharacterDatabase.CommitTransaction();
     }
@@ -611,7 +607,7 @@ void AuctionHouseObject::BuildListAuctionItems(WorldPacket& data, Player* player
     for (AuctionEntryMap::const_iterator itr = AuctionsMap.begin();itr != AuctionsMap.end();++itr)
     {
         AuctionEntry *Aentry = itr->second;
-        Item *item = auctionmgr.GetAItem(Aentry->item_guidlow);
+        Item *item = sAuctionMgr->GetAItem(Aentry->item_guidlow);
         if (!item)
             continue;
 
@@ -665,7 +661,7 @@ void AuctionHouseObject::BuildListAuctionItems(WorldPacket& data, Player* player
 // this function inserts to WorldPacket auction's data
 bool AuctionEntry::BuildAuctionInfo(WorldPacket & data) const
 {
-    Item *pItem = auctionmgr.GetAItem(item_guidlow);
+    Item *pItem = sAuctionMgr->GetAItem(item_guidlow);
     if (!pItem)
     {
         sLog.outError("auction to item, that doesn't exist !!!!");

@@ -1,3 +1,22 @@
+/*
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include "ObjectMgr.h"
 #include "AuctionHouseMgr.h"
 #include "AuctionHouseBot.h"
@@ -117,12 +136,12 @@ void AuctionHouseBot::addNewAuctions(Player *AHBplayer, AHBConfig *config)
         return;
     }
 
-    AuctionHouseEntry const* ahEntry = auctionmgr.GetAuctionHouseEntry(config->GetAHFID());
+    AuctionHouseEntry const* ahEntry = sAuctionMgr->GetAuctionHouseEntry(config->GetAHFID());
     if (!ahEntry)
     {
         return;
     }
-    AuctionHouseObject* auctionHouse = auctionmgr.GetAuctionsMap(config->GetAHFID());
+    AuctionHouseObject* auctionHouse = sAuctionMgr->GetAuctionsMap(config->GetAHFID());
     if (!auctionHouse)
     {
         return;
@@ -405,7 +424,7 @@ void AuctionHouseBot::addNewAuctions(Player *AHBplayer, AHBConfig *config)
             }
             item->SetCount(stackCount);
 
-            uint32 dep = auctionmgr.GetAuctionDeposit(ahEntry, etime, item);
+            uint32 dep = sAuctionMgr->GetAuctionDeposit(ahEntry, etime, item);
 
             AuctionEntry* auctionEntry = new AuctionEntry;
             auctionEntry->Id = objmgr.GenerateAuctionID();
@@ -422,7 +441,7 @@ void AuctionHouseBot::addNewAuctions(Player *AHBplayer, AHBConfig *config)
             auctionEntry->auctionHouseEntry = ahEntry;
             item->SaveToDB();
             item->RemoveFromUpdateQueueOf(AHBplayer);
-            auctionmgr.AddAItem(item);
+            sAuctionMgr->AddAItem(item);
             auctionHouse->AddAuction(auctionEntry);
             auctionEntry->SaveToDB();
 
@@ -493,7 +512,7 @@ void AuctionHouseBot::addNewAuctionBuyerBotBid(Player *AHBplayer, AHBConfig *con
         return;
 
     // Fetches content of selected AH
-    AuctionHouseObject* auctionHouse = auctionmgr.GetAuctionsMap(config->GetAHFID());
+    AuctionHouseObject* auctionHouse = sAuctionMgr->GetAuctionsMap(config->GetAHFID());
     vector<uint32> possibleBids;
 
     do
@@ -527,7 +546,7 @@ void AuctionHouseBot::addNewAuctionBuyerBotBid(Player *AHBplayer, AHBConfig *con
             continue;
 
         // get exact item information
-        Item *pItem = auctionmgr.GetAItem(auction->item_guidlow);
+        Item *pItem = sAuctionMgr->GetAItem(auction->item_guidlow);
         if (!pItem)
         {
             if (debug_Out) sLog.outError("AHBuyer: Item %u doesn't exist, perhaps bought already?", auction->item_guidlow);
@@ -674,12 +693,12 @@ void AuctionHouseBot::addNewAuctionBuyerBotBid(Player *AHBplayer, AHBConfig *con
             auction->bid = auction->buyout;
 
             // Send mails to buyer & seller
-            auctionmgr.SendAuctionSalePendingMail(auction);
-            auctionmgr.SendAuctionSuccessfulMail(auction);
-            auctionmgr.SendAuctionWonMail(auction);
+            sAuctionMgr->SendAuctionSalePendingMail(auction);
+            sAuctionMgr->SendAuctionSuccessfulMail(auction);
+            sAuctionMgr->SendAuctionWonMail(auction);
             auction->DeleteFromDB();
             uint32 item_template = auction->item_template;
-            auctionmgr.RemoveAItem(auction->item_guidlow);
+            sAuctionMgr->RemoveAItem(auction->item_guidlow);
             auctionHouse->RemoveAuction(auction, item_template);
         }
     }
@@ -1354,7 +1373,7 @@ void AuctionHouseBot::IncrementItemCounts(AuctionEntry* ah)
     // from auctionhousehandler.cpp, creates auction pointer & player pointer
 
     // get exact item information
-    Item *pItem = auctionmgr.GetAItem(ah->item_guidlow);
+    Item *pItem = sAuctionMgr->GetAItem(ah->item_guidlow);
     if (!pItem)
     {
         if (debug_Out) sLog.outError("AHBot: Item %u doesn't exist, perhaps bought already?", ah->item_guidlow);
@@ -1469,7 +1488,7 @@ void AuctionHouseBot::Commands(uint32 command, uint32 ahMapID, uint32 col, char*
     {
     case 0:     //ahexpire
         {
-            AuctionHouseObject* auctionHouse = auctionmgr.GetAuctionsMap(config->GetAHFID());
+            AuctionHouseObject* auctionHouse = sAuctionMgr->GetAuctionsMap(config->GetAHFID());
 
             AuctionHouseObject::AuctionEntryMap::iterator itr;
             itr = auctionHouse->GetAuctionsBegin();
@@ -1743,8 +1762,8 @@ void AuctionHouseBot::LoadValues(AHBConfig *config)
             sLog.outString("maxStackOrange          = %u", config->GetMaxStack(AHB_ORANGE));
             sLog.outString("maxStackYellow          = %u", config->GetMaxStack(AHB_YELLOW));
         }
-        //AuctionHouseEntry const* ahEntry = auctionmgr.GetAuctionHouseEntry(config->GetAHFID());
-        AuctionHouseObject* auctionHouse = auctionmgr.GetAuctionsMap(config->GetAHFID());
+        //AuctionHouseEntry const* ahEntry = sAuctionMgr->GetAuctionHouseEntry(config->GetAHFID());
+        AuctionHouseObject* auctionHouse = sAuctionMgr->GetAuctionsMap(config->GetAHFID());
 
         config->ResetItemCounts();
         uint32 auctions = auctionHouse->Getcount();
@@ -1754,7 +1773,7 @@ void AuctionHouseBot::LoadValues(AHBConfig *config)
             for (AuctionHouseObject::AuctionEntryMap::const_iterator itr = auctionHouse->GetAuctionsBegin(); itr != auctionHouse->GetAuctionsEnd(); ++itr)
             {
                 AuctionEntry *Aentry = itr->second;
-                Item *item = auctionmgr.GetAItem(Aentry->item_guidlow);
+                Item *item = sAuctionMgr->GetAItem(Aentry->item_guidlow);
                 if (item)
                 {
                     ItemPrototype const *prototype = item->GetProto();

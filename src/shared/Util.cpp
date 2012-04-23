@@ -1,9 +1,7 @@
 /*
- * Copyright (C) 2005-2010 MaNGOS <http://getmangos.com/>
- *
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
- *
- * Copyright (C) 2010 Oregon <http://www.oregoncore.com/>
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -474,4 +472,17 @@ void hexEncodeByteArray(uint8* bytes, uint32 arrayLen, std::string& result)
         }
     }
     result = ss.str();
+}
+
+std::string ByteArrayToHexStr(uint8* bytes, uint32 length)
+{
+    std::ostringstream ss;
+    for (uint32 i = 0; i < length; ++i)
+    {
+        char buffer[4];
+        sprintf(buffer, "%02X ", bytes[i]);
+        ss << buffer;
+    }
+
+    return ss.str();
 }

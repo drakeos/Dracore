@@ -1,23 +1,20 @@
 /*
- * Copyright (C) 2005-2008 MaNGOS <http://www.mangosproject.org/>
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
- * Copyright (C) 2008 Trinity <http://www.trinitycore.org/>
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * Copyright (C) 2010-2011 Oregon <http://www.oregoncore.com/>
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "Common.h"
@@ -49,6 +46,7 @@
 #include "CellImpl.h"
 #include "OutdoorPvPMgr.h"
 #include "GameEventMgr.h"
+#include "CreatureFormations.h"
 #include "CreatureGroups.h"
 // apply implementation of the singletons
 #include "Policies/SingletonImp.h"
@@ -157,6 +155,7 @@ m_regenHealth(true), m_AI_locked(false), m_isDeadByDefault(false),
 m_meleeDamageSchoolMask(SPELL_SCHOOL_MASK_NORMAL),m_creatureInfo(NULL), m_DBTableGuid(0), m_formation(NULL), m_PlayerDamageReq(0), m_summonMask(SUMMON_MASK_NONE)
 , m_AlreadySearchedAssistance(false)
 , m_creatureData(NULL)
+, m_group(NULL)
 {
     m_valuesCount = UNIT_END;
 
@@ -191,6 +190,7 @@ void Creature::AddToWorld()
         ObjectAccessor::Instance().AddObject(this);
         Unit::AddToWorld();
         SearchFormation();
+        SearchGroup();
         AIM_Initialize();
     }
 }
@@ -202,7 +202,7 @@ void Creature::RemoveFromWorld()
         if (m_zoneScript)
             m_zoneScript->OnCreatureCreate(this, false);
         if (m_formation)
-            formation_mgr.RemoveCreatureFromGroup(m_formation, this);
+            formation_mgr.RemoveCreatureFromFormation(m_formation, this);
         Unit::RemoveFromWorld();
         ObjectAccessor::Instance().RemoveObject(this);
     }
@@ -225,9 +225,23 @@ void Creature::SearchFormation()
     if (!lowguid)
         return;
 
-    CreatureGroupInfoType::iterator frmdata = CreatureGroupMap.find(lowguid);
-    if (frmdata != CreatureGroupMap.end())
-        formation_mgr.AddCreatureToGroup(frmdata->second->leaderGUID, this);
+    CreatureFormationDataType::iterator frmdata = CreatureFormationDataMap.find(lowguid);
+    if (frmdata != CreatureFormationDataMap.end())
+        formation_mgr.AddCreatureToFormation(frmdata->second->formationId, this);
+}
+
+void Creature::SearchGroup()
+{
+    if (isPet())
+        return;
+
+    uint32 lowguid = GetDBTableGUIDLow();
+    if (!lowguid)
+        return;
+
+    CreatureGroupDataType::iterator grpdata = CreatureGroupDataMap.find(lowguid);
+    if (grpdata != CreatureGroupDataMap.end()) 
+        group_mgr.AddCreatureToGroup(grpdata->second, this);
 }
 
 void Creature::RemoveCorpse(bool setSpawnTime)
@@ -240,8 +254,8 @@ void Creature::RemoveCorpse(bool setSpawnTime)
     UpdateObjectVisibility();
     loot.clear();
     // Should get removed later, just keep "compatibility" with scripts
-	if(setSpawnTime)
-		m_respawnTime = time(NULL) + m_respawnDelay;
+    if (setSpawnTime)
+        m_respawnTime = time(NULL) + m_respawnDelay;
 
     float x,y,z,o;
     GetRespawnCoord(x, y, z, &o);
@@ -507,6 +521,12 @@ void Creature::Update(uint32 diff)
         {
             if (m_isDeadByDefault)
                 break;
+
+            if (GetGroup() && GetGroup()->IsAllowedToRespawn(this))
+            {
+                Respawn();
+                break;
+            }
 
             if (m_corpseRemoveTime <= time(NULL))
             {
@@ -1354,7 +1374,7 @@ void Creature::setDeathState(DeathState s)
     if ((s == JUST_DIED && !m_isDeadByDefault)||(s == JUST_ALIVED && m_isDeadByDefault))
     {
         m_corpseRemoveTime = time(NULL) + m_corpseDelay;
-		m_respawnTime = time(NULL) + m_respawnDelay + m_corpseDelay;
+        m_respawnTime = time(NULL) + m_respawnDelay + m_corpseDelay;
 
         // always save boss respawn time at death to prevent crash cheating
         if (sWorld.getConfig(CONFIG_SAVE_RESPAWN_TIME_IMMEDIATELY) || isWorldBoss())
@@ -1364,7 +1384,10 @@ void Creature::setDeathState(DeathState s)
 
         //Dismiss group if is leader
         if (m_formation && m_formation->getLeader() == this)
-            m_formation->FormationReset(true);
+            m_formation->Reset(true);
+
+        if (m_zoneScript)
+            m_zoneScript->OnCreatureDeath(this);
 
         if (canFly() && FallGround())
             return;
@@ -1622,16 +1645,13 @@ bool Creature::IsVisibleInGridForPlayer(Player const* pl) const
         return isAlive() || m_corpseRemoveTime > time(NULL) || m_isDeadByDefault && m_deathState == CORPSE;
     }
 
-    // Dead player see live creatures near own corpse
-    if (isAlive())
+    // Dead player see creatures near own corpse
+    Corpse *corpse = pl->GetCorpse();
+    if (corpse)
     {
-        Corpse *corpse = pl->GetCorpse();
-        if (corpse)
-        {
-            // 20 - aggro distance for same level, 25 - max additional distance if player level less that creature level
-            if (corpse->IsWithinDistInMap(this,(20+25)*sWorld.getRate(RATE_CREATURE_AGGRO)))
-                return true;
-        }
+        // 20 - aggro distance for same level, 25 - max additional distance if player level less that creature level
+        if (corpse->IsWithinDistInMap(this, (20 + 25) * sWorld.getRate(RATE_CREATURE_AGGRO)))
+            return true;
     }
 
     // Dead player see Spirit Healer or Spirit Guide
@@ -1798,7 +1818,7 @@ void Creature::SaveRespawnTime()
     if (isPet() || !m_DBTableGuid || m_creatureData && !m_creatureData->dbData)
         return;
 
-	objmgr.SaveCreatureRespawnTime(m_DBTableGuid,GetInstanceId(),m_respawnTime);
+    objmgr.SaveCreatureRespawnTime(m_DBTableGuid,GetInstanceId(),m_respawnTime);
 }
 
 bool Creature::IsOutOfThreatArea(Unit* pVictim) const
@@ -2049,10 +2069,10 @@ void Creature::AllLootRemovedFromCorpse()
     if (!HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_SKINNABLE))
     {
         time_t now = time(NULL);
-		if(m_corpseRemoveTime <= now)
-			return;
+        if (m_corpseRemoveTime <= now)
+            return;
 
-		float decayRate;
+        float decayRate;
         CreatureInfo const *cinfo = GetCreatureInfo();
 
         // corpse was not skinnable -> apply corpse looted timer

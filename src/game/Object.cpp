@@ -1,23 +1,20 @@
 /*
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
- * Copyright (C) 2008-2009 Trinity <http://www.trinitycore.org/>
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * Copyright (C) 2010 Oregon <http://www.oregoncore.com/>
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "Common.h"
@@ -374,9 +371,9 @@ void Object::_BuildMovementUpdate(ByteBuffer * data, uint8 updateFlags) const
         // Unit speeds
         *data << ((Unit*)this)->GetSpeed(MOVE_WALK);
         *data << ((Unit*)this)->GetSpeed(MOVE_RUN);
-        *data << ((Unit*)this)->GetSpeed(MOVE_SWIM_BACK);
-        *data << ((Unit*)this)->GetSpeed(MOVE_SWIM);
         *data << ((Unit*)this)->GetSpeed(MOVE_RUN_BACK);
+        *data << ((Unit*)this)->GetSpeed(MOVE_SWIM);
+        *data << ((Unit*)this)->GetSpeed(MOVE_SWIM_BACK);
         *data << ((Unit*)this)->GetSpeed(MOVE_FLIGHT);
         *data << ((Unit*)this)->GetSpeed(MOVE_FLIGHT_BACK);
         *data << ((Unit*)this)->GetSpeed(MOVE_TURN_RATE);
@@ -734,6 +731,24 @@ bool Object::LoadValues(const char* data)
     }
 
     return true;
+}
+
+void Object::_LoadIntoDataField(const char* data, uint32 startOffset, uint32 count)
+{
+    if (!data)
+        return;
+
+    Tokens tokens = StrSplit(data, " ");
+
+    if (tokens.size() != count)
+        return;
+
+    Tokens::iterator iter;
+    uint32 index;
+    for (iter = tokens.begin(), index = 0; index < count; ++iter, ++index)
+    {
+        m_uint32Values[startOffset + index] = atol((*iter).c_str());
+    }
 }
 
 void Object::_SetUpdateBits(UpdateMask *updateMask, Player* /*target*/) const
@@ -1619,29 +1634,44 @@ void WorldObject::AddObjectToRemoveList()
     map->AddObjectToRemoveList(this);
 }
 
-TempSummon *Map::SummonCreature(uint32 entry, const Position &pos, SummonPropertiesEntry const *properties, uint32 duration, Unit *summoner)
+TempSummon *Map::SummonCreature(uint32 entry, const Position &pos, SummonPropertiesEntry const *properties, uint32 duration, Unit *summoner, SpellEntry const* spellInfo)
 {
     uint32 mask = SUMMON_MASK_SUMMON;
     if (properties)
     {
-        switch(properties->Category)
+        switch (properties->Category)
         {
-            case SUMMON_CATEGORY_PET:       mask = SUMMON_MASK_GUARDIAN;  break;
-            case SUMMON_CATEGORY_PUPPET:    mask = SUMMON_MASK_PUPPET;    break;
-            default:
-                switch(properties->Type)
+            case SUMMON_CATEGORY_PET:
+                mask = SUMMON_MASK_GUARDIAN;
+                break;
+            case SUMMON_CATEGORY_PUPPET:
+                mask = SUMMON_MASK_PUPPET;
+                break;
+            case SUMMON_CATEGORY_WILD:
+            case SUMMON_CATEGORY_ALLY:
+            {
+                switch (properties->Type)
                 {
-                    case SUMMON_TYPE_MINION:
-                    case SUMMON_TYPE_GUARDIAN:
-                        mask = SUMMON_MASK_GUARDIAN;  break;
-                    case SUMMON_TYPE_TOTEM:
-                        mask = SUMMON_MASK_TOTEM;     break;
-                    case SUMMON_TYPE_MINIPET:
-                        mask = SUMMON_MASK_MINION;    break;
-                    default:
-                        break;
+                case SUMMON_TYPE_MINION:
+                case SUMMON_TYPE_GUARDIAN:
+                case SUMMON_TYPE_GUARDIAN2:
+                    mask = SUMMON_MASK_GUARDIAN;
+                    break;
+                case SUMMON_TYPE_TOTEM:
+                    mask = SUMMON_MASK_TOTEM;
+                    break;
+                case SUMMON_TYPE_MINIPET:
+                    mask = SUMMON_MASK_MINION;
+                    break;
+                default:
+                    if (properties->Flags & 512)
+                        mask = SUMMON_MASK_GUARDIAN;
+                    break;
                 }
                 break;
+            }
+            default:
+                return NULL;
         }
     }
 
@@ -1650,14 +1680,25 @@ TempSummon *Map::SummonCreature(uint32 entry, const Position &pos, SummonPropert
         team = summoner->ToPlayer()->GetTeam();
 
     TempSummon *summon = NULL;
-    switch(mask)
+    switch (mask)
     {
-        case SUMMON_MASK_SUMMON:    summon = new TempSummon (properties, summoner);  break;
-        case SUMMON_MASK_GUARDIAN:  summon = new Guardian   (properties, summoner);  break;
-        case SUMMON_MASK_PUPPET:    summon = new Puppet     (properties, summoner);  break;
-        case SUMMON_MASK_TOTEM:     summon = new Totem      (properties, summoner);  break;
-        case SUMMON_MASK_MINION:    summon = new Minion     (properties, summoner);  break;
-        default:    return NULL;
+        case SUMMON_MASK_SUMMON:
+            summon = new TempSummon(properties, summoner);
+            break;
+        case SUMMON_MASK_GUARDIAN:
+            summon = new Guardian(properties, summoner);
+            break;
+        case SUMMON_MASK_PUPPET:
+            summon = new Puppet(properties, summoner);
+            break;
+        case SUMMON_MASK_TOTEM:
+            summon = new Totem(properties, summoner);
+            break;
+        case SUMMON_MASK_MINION:
+            summon = new Minion(properties, summoner);
+            break;
+        default:
+            return NULL;
     }
 
     if (!summon->Create(objmgr.GenerateLowGuid(HIGHGUID_UNIT), this, entry, team, pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ(), pos.GetOrientation()))
@@ -1665,6 +1706,24 @@ TempSummon *Map::SummonCreature(uint32 entry, const Position &pos, SummonPropert
         delete summon;
         return NULL;
     }
+
+    if (mask == SUMMON_MASK_TOTEM && spellInfo)
+    {
+        if (Player *pPlayer = summoner->ToPlayer())
+        {
+            if (properties->Slot >= SUMMON_SLOT_TOTEM && properties->Slot < MAX_TOTEM_SLOT)
+            {
+                WorldPacket data(SMSG_TOTEM_CREATED, 1+8+4+4);
+                data << uint8(properties->Slot-1);
+                data << uint64(pPlayer->GetGUID());
+                data << uint32(duration);
+                data << uint32(spellInfo->Id);
+                pPlayer->SendDirectMessage(&data);
+            }
+        }
+    }
+
+    summon->SetHomePosition(pos);
 
     summon->InitStats(duration);
     Add(summon->ToCreature());
@@ -1679,9 +1738,7 @@ TempSummon* WorldObject::SummonCreature(uint32 entry, const Position &pos, TempS
     {
         if (TempSummon *summon = map->SummonCreature(entry, pos, NULL, duration, isType(TYPEMASK_UNIT) ? (Unit*)this : NULL))
         {
-            summon->SetHomePosition(pos);
             summon->SetTempSummonType(spwtype);
-
             return summon;
         }
     }
@@ -1764,6 +1821,7 @@ Pet* Player::SummonPet(uint32 entry, float x, float y, float z, float ang, PetTy
 
     switch(petType)
     {
+        case CLASS_PET:
         case SUMMON_PET:
             pet->SetUInt32Value(UNIT_FIELD_BYTES_0, 2048);
             pet->SetUInt32Value(UNIT_FIELD_PETEXPERIENCE, 0);
@@ -1778,6 +1836,7 @@ Pet* Player::SummonPet(uint32 entry, float x, float y, float z, float ang, PetTy
 
     switch(petType)
     {
+        case CLASS_PET:
         case SUMMON_PET:
             pet->InitPetCreateSpells();
             pet->SavePetToDB(PET_SAVE_AS_CURRENT);
@@ -1925,6 +1984,57 @@ void WorldObject::MovePosition(Position &pos, float dist, float angle)
     Oregon::NormalizeMapCoord(pos.m_positionY);
     UpdateGroundPositionZ(pos.m_positionX, pos.m_positionY, pos.m_positionZ);
     pos.m_orientation = m_orientation;
+}
+
+void WorldObject::MovePositionToFirstCollision(Position &pos, float dist, float angle)
+{
+        angle += m_orientation;
+        float destx, desty, destz, ground, floor;
+ 
+
+        destx = pos.m_positionX + dist * cos(angle);
+        desty = pos.m_positionY + dist * sin(angle);
+        ground = GetMap()->GetHeight(destx, desty, MAX_HEIGHT, true);
+        floor = GetMap()->GetHeight(destx, desty, pos.m_positionZ, true);
+        destz = fabs(ground - pos.m_positionZ) <= fabs(floor - pos.m_positionZ) ? ground : floor;
+
+        bool col = VMAP::VMapFactory::createOrGetVMapManager()->getObjectHitPos(GetMapId(),pos.m_positionX,pos.m_positionY,pos.m_positionZ+0.5f,destx,desty,destz+0.5f,destx,desty,destz,-0.5f);
+
+        // collision occured
+        if (col)
+        {
+        // move back a bit
+        destx -= CONTACT_DISTANCE * cos(angle);
+        desty -= CONTACT_DISTANCE * sin(angle);
+        dist = sqrt((pos.m_positionX - destx)*(pos.m_positionX - destx) + (pos.m_positionY - desty)*(pos.m_positionY - desty));
+        }
+
+        float step = dist/10.0f;
+
+        int j = 0;
+        for (j; j < 10; j++)
+        {
+        // do not allow too big z changes
+        if (fabs(pos.m_positionZ - destz) > 6)
+        {
+                destx -= step * cos(angle);
+                desty -= step * sin(angle);
+                ground = GetMap()->GetHeight(destx, desty, MAX_HEIGHT, true);
+                floor = GetMap()->GetHeight(destx, desty, pos.m_positionZ, true);
+                destz = fabs(ground - pos.m_positionZ) <= fabs(floor - pos.m_positionZ) ? ground : floor;
+        }
+        // we have correct destz now
+        else
+        {
+                pos.Relocate(destx, desty, destz);
+                break;
+        }
+        }
+
+        Oregon::NormalizeMapCoord(pos.m_positionX);
+        Oregon::NormalizeMapCoord(pos.m_positionY);
+        UpdateGroundPositionZ(pos.m_positionX, pos.m_positionY, pos.m_positionZ);
+        pos.m_orientation = m_orientation;
 }
 
 void WorldObject::PlayDistanceSound(uint32 sound_id, Player* target /*= NULL*/)

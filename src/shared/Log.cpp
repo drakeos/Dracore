@@ -1,9 +1,7 @@
 /*
- * Copyright (C) 2005-2010 MaNGOS <http://getmangos.com/>
- *
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
- *
- * Copyright (C) 2010 Oregon <http://www.oregoncore.com/>
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -34,7 +32,7 @@ Log::Log() :
     raLogfile(NULL), logfile(NULL), gmLogfile(NULL), charLogfile(NULL),
     dberLogfile(NULL), chatLogfile(NULL), m_gmlog_per_account(false),
     m_enableLogDBLater(false), m_enableLogDB(false), m_colored(false),
-    arenaLogFile(NULL)
+    arenaLogFile(NULL), wardenLogFile(NULL)
 {
     Initialize();
 }
@@ -68,6 +66,10 @@ Log::~Log()
     if (arenaLogFile != NULL)
         fclose(arenaLogFile);
     arenaLogFile = NULL;
+
+    if (wardenLogFile != NULL)
+        fclose(wardenLogFile);
+    wardenLogFile = NULL;
 }
 
 void Log::SetLogLevel(char *Level)
@@ -159,6 +161,7 @@ void Log::Initialize()
     raLogfile = openLogFile("RaLogFile",NULL,"a");
     chatLogfile = openLogFile("ChatLogFile","ChatLogTimestamp","a");
     arenaLogFile = openLogFile("ArenaLogFile",NULL,"a");
+    wardenLogFile = openLogFile("Warden.LogFile",NULL,"a");
 
     // Main log file settings
     m_logLevel     = sConfig.GetIntDefault("LogLevel", LOGL_NORMAL);
@@ -881,3 +884,26 @@ void Log::outChat(const char * str, ...)
     fflush(stdout);
 }
 
+void Log::outWarden(const char * str, ...)
+{
+    if(!str)
+        return;
+
+    UTF8PRINTF(stdout,str,);
+
+    printf("\n");
+    if (wardenLogFile)
+    {
+        outTimestamp(wardenLogFile);
+        fprintf(wardenLogFile, "WARDEN: ");
+
+        va_list ap;
+        va_start(ap, str);
+        vfprintf(wardenLogFile, str, ap);
+        fprintf(wardenLogFile, "\n");
+        va_end(ap);
+
+        fflush(wardenLogFile);
+    }
+    fflush(stdout);
+}

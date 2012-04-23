@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2006-2012 ScriptDev2 <http://www.scriptdev2.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -18,8 +19,8 @@
 
 /* ScriptData
 SDName: Netherstorm
-SD%Complete: 75
-SDComment: Quest support: 10337, 10438, 10652 (special flight paths), 10299,10321,10322,10323,10329,10330,10338,10365(Shutting Down Manaforge), 10198, 10191
+SD%Complete: 90
+SDComment: Quest support: 10337, 10438, 10652 (special flight paths), 10299,10321,10322,10323,10329,10330,10338,10365(Shutting Down Manaforge), 10198, 10191, 10924, 10221, 10310.
 SDCategory: Netherstorm
 EndScriptData */
 
@@ -27,8 +28,15 @@ EndScriptData */
 npc_manaforge_control_console
 go_manaforge_control_console
 npc_commander_dawnforge
+at_commander_dawnforge
+npc_professor_dabiri
+mob_phase_hunter
 npc_bessy
 npc_maxx_a_million
+npc_zeppit
+npc_dr_boom
+npc_boom_bot
+npc_drijya
 EndContentData */
 
 #include "ScriptPCH.h"
@@ -1008,6 +1016,442 @@ bool QuestAccept_npc_maxx_a_million_escort(Player* pPlayer, Creature* pCreature,
     return true;
 }
 
+/*######
+## npc_zeppit
+######*/
+
+enum
+{
+    EMOTE_GATHER_BLOOD         = -1000625,
+
+    NPC_WARP_CHASER            = 18884,
+    SPELL_GATHER_WARP_BLOOD    = 39244,
+    QUEST_BLOODY               = 10924
+};
+
+struct npc_zeppitAI : public ScriptedAI
+{
+    npc_zeppitAI(Creature *pCreature) : ScriptedAI(pCreature) {}
+
+    uint32 uiCheckTimer;
+    uint64 uiWarpGUID;
+
+    void Reset() 
+    {
+        uiCheckTimer = 8000;
+        uiWarpGUID = 0;
+    }
+
+    void UpdateAI(const uint32 uiDiff)
+    {
+        if (uiCheckTimer <= uiDiff)
+        {
+            if (Creature* pWarp = me->FindNearestCreature(NPC_WARP_CHASER, 9.0f, false))
+            {
+                if (pWarp->GetGUID() != uiWarpGUID && CAST_PLR(me->GetOwner())->GetQuestStatus(QUEST_BLOODY) == QUEST_STATUS_INCOMPLETE)
+                {
+                    uiWarpGUID = pWarp->GetGUID();
+                    DoScriptText(EMOTE_GATHER_BLOOD, me);
+                    me->CastSpell(me->GetOwner(), SPELL_GATHER_WARP_BLOOD, false);
+                }
+            }
+            uiCheckTimer = 8000;
+        }
+        else uiCheckTimer -= uiDiff;
+    }
+};
+
+CreatureAI* GetAI_npc_zeppit(Creature* pCreature)
+{
+    return new npc_zeppitAI (pCreature);
+}
+
+/*######
+## npc_dr_boom
+######*/
+
+enum
+{
+    THROW_DYNAMITE    = 35276,
+    BOOM_BOT          = 19692,
+    BOOM_BOT_TARGET   = 20392
+};
+
+struct npc_dr_boomAI : public ScriptedAI
+{
+    npc_dr_boomAI(Creature *pCeature) : ScriptedAI(pCeature) {}
+
+    std::vector<uint64> targetGUID;
+
+    uint32 SummonTimer;
+ 
+    void Reset()
+    {
+        SummonTimer = 1500;
+ 
+        std::list<Creature*> targets;
+        me->GetCreatureListWithEntryInGrid(targets, BOOM_BOT_TARGET, 30.0f);
+ 
+        targetGUID.clear();
+ 
+        for (std::list<Creature*>::iterator it = targets.begin(); it != targets.end(); it++)
+            targetGUID.push_back((*it)->GetGUID());
+    }
+
+    void UpdateAI(const uint32 uiDiff)
+    {
+        if (SummonTimer <= uiDiff)
+        {
+            if (targetGUID.size())
+            {
+                if (Unit* target = Unit::GetUnit(*me, targetGUID[rand()%targetGUID.size()]))
+                {
+                    if (Unit* bot = DoSpawnCreature(BOOM_BOT, 0, 0, 0, 0, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 20000))
+                        bot->GetMotionMaster()->MovePoint(0, target->GetPositionX(), target->GetPositionY(), target->GetPositionZ());
+                }
+            }
+ 
+            SummonTimer = 1500;
+        }
+        else SummonTimer -= uiDiff;
+
+        if (!UpdateVictim())
+            return;
+ 
+        if (!me->IsWithinDistInMap(me->getVictim(), 30.0f))
+        {
+            EnterEvadeMode();
+            return;
+        }
+ 
+        if (me->isAttackReady() && me->IsWithinDistInMap(me->getVictim(), 13.0f))
+        {
+            DoCast(me->getVictim(), THROW_DYNAMITE, true);
+            me->resetAttackTimer();
+        }
+    }
+
+};
+
+CreatureAI* GetAI_npc_dr_boom(Creature* pCreature)
+{
+    return new npc_dr_boomAI (pCreature);
+}
+
+/*######
+## npc_boom_bot
+######*/
+
+#define    SPELL_BOOM    35132                         
+
+struct npc_boom_botAI : public ScriptedAI
+{
+    npc_boom_botAI(Creature *pCreature) : ScriptedAI(pCreature) {}
+
+    bool Boom;
+
+    uint32 BoomTimer;
+
+    void Reset()
+    {
+        Boom = false;
+        BoomTimer = 800;
+        me->SetUnitMovementFlags(MOVEFLAG_WALK_MODE);
+    }
+ 
+    void AttackedBy(Unit* pWho) {}
+    void AttackStart(Unit* pWho) {}
+ 
+    void MovementInform(uint32 type, uint32 id)
+    {
+        if (type != POINT_MOTION_TYPE)
+            return;
+ 
+        DoCast(SPELL_BOOM);
+        Boom = true;
+    }
+ 
+    void MoveInLineOfSight(Unit *pWho)
+    {
+        if (!pWho->isCharmedOwnedByPlayerOrPlayer())
+            return;
+ 
+        if (me->IsWithinDistInMap(pWho, 4.0f, false))
+        {
+            DoCast(SPELL_BOOM);
+            Boom = true;
+        }
+    }
+ 
+    void UpdateAI(const uint32 uiDiff)
+    {
+        if (Boom)
+        {
+            if (BoomTimer <= uiDiff)
+            {
+                me->setDeathState(CORPSE);
+            }
+            else BoomTimer -= uiDiff;
+        }
+    }
+};
+
+CreatureAI* GetAI_npc_boom_bot(Creature* pCreature)
+{
+    return new npc_boom_botAI (pCreature);
+}
+
+/*######
+## npc_drijya
+######*/
+
+enum
+{
+    SAY_DR_START           = -1900156,
+    SAY_DR_1               = -1900157,
+    SAY_DR_2               = -1900158,
+    SAY_DR_3               = -1900159,
+    SAY_DR_4               = -1900160,
+    SAY_DR_5               = -1900161,
+    SAY_DR_6               = -1900162,
+    SAY_DR_7               = -1900163,
+    SAY_DR_COMPLETE        = -1900164,
+
+    QUEST_WARP_GATE        = 10310,
+
+    MAX_TROOPER            = 9,
+    MAX_IMP                = 6,
+
+    NPC_EXPLODE_TRIGGER    = 20296,
+    NPC_IMP                = 20399,
+    NPC_TROOPER            = 20402,
+    NPC_DESTROYER          = 20403,
+
+    GO_SMOKE               = 185318,
+    GO_FIRE                = 185317,
+    GO_BIG_FIRE            = 185319
+};
+
+struct npc_drijyaAI : public npc_escortAI
+{
+    npc_drijyaAI(Creature* pCreature) : npc_escortAI(pCreature) {}
+
+    bool Destroy;
+    bool SummonImp;
+    bool SummonTrooper;
+    bool SummonDestroyer;
+
+    uint32 Count;
+    uint32 SpawnTimer;
+    uint32 StartSpawnTimer;
+    uint32 DestroyingTimer;
+
+    void Reset()
+    {
+        Destroy = false;
+        SummonImp = false;
+        SummonTrooper = false;
+        SummonDestroyer = false;
+        Count = 0;
+        SpawnTimer = 3500;
+        StartSpawnTimer = 15000;
+        DestroyingTimer = 60000;
+    }
+
+    void AttackedBy(Unit* pWho) {}
+    void AttackStart(Unit* pWho) {}
+
+    void SpawnImp()
+    {
+        ++Count;
+        me->SummonCreature(NPC_IMP, 3025.752f, 2715.122, 113.758, 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
+    }
+
+    void SpawnTrooper()
+    {
+        ++Count;
+        me->SummonCreature(NPC_TROOPER, 3025.752f, 2715.122, 113.758, 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
+    }
+
+    void SpawnDestroyer()
+    {
+        me->SummonCreature(NPC_DESTROYER, 3019.741f, 2720.757, 115.189, 2.5f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 10000);
+    }
+
+    void JustSummoned(Creature* pSummoned)
+    {
+        if (pSummoned->GetEntry() == NPC_IMP)
+        {
+            if (Player* pPlayer = GetPlayerForEscort())
+                pSummoned->AI()->AttackStart(pPlayer); 
+        }
+        if (pSummoned->GetEntry() == NPC_TROOPER)
+        {
+            if(Player* pPlayer = GetPlayerForEscort())
+                pSummoned->AI()->AttackStart(pPlayer);
+        }
+        else
+        {
+            if (pSummoned->GetEntry() == NPC_DESTROYER)
+            {
+                if (Player* pPlayer = GetPlayerForEscort())
+                    pSummoned->AI()->AttackStart(pPlayer);
+            }
+        }
+     }
+
+    void WaypointReached(uint32 uiPointId)
+    {
+        switch(uiPointId)
+        {
+            case 0:
+                DoScriptText(SAY_DR_START, me);
+                SetRun();
+                break;
+            case 1:
+                DoScriptText(SAY_DR_1, me);
+                break;
+            case 5:
+                DoScriptText(SAY_DR_2, me);
+                break;
+            case 7:
+                SetEscortPaused(true);
+                Destroy = true;
+                SummonImp = true;
+                break;
+            case 8:
+                me->SummonGameObject(GO_SMOKE, 3049.354f, 2726.431f, 113.922f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 215);
+                DoScriptText(SAY_DR_4, me);
+                break;
+            case 12:
+                SetEscortPaused(true);
+                Destroy = true;
+                SummonTrooper = true;
+                break;
+            case 13:
+                me->SummonGameObject(GO_SMOKE, 3020.842f, 2697.501f, 113.368f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 140);
+                DoScriptText(SAY_DR_5, me);
+                break;
+            case 17:
+                SetEscortPaused(true);
+                Destroy = true;
+                SummonDestroyer = true;
+                break;
+            case 18:
+                DoScriptText(SAY_DR_6, me);
+                if (Creature* pTrigger = me->FindNearestCreature(NPC_EXPLODE_TRIGGER, 20.0f))
+                {
+                    pTrigger->CastSpell(pTrigger, SPELL_BOOM , false);
+                }
+                me->SummonGameObject(GO_SMOKE, 3008.503f, 2729.432f, 114.350f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 60);
+                me->SummonGameObject(GO_FIRE, 3026.163f, 2723.538f, 113.681f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 60);
+                me->SummonGameObject(GO_BIG_FIRE, 3021.556f, 2718.887f, 115.055f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 60);
+                break;
+            case 19:
+                DoScriptText(SAY_DR_7, me);
+                break;
+            case 22:
+                SetRun(false);
+                break;
+            case 26:
+                if (Player* pPlayer = GetPlayerForEscort())
+                {
+                    DoScriptText(SAY_DR_COMPLETE, me, pPlayer);
+                    pPlayer->GroupEventHappens(QUEST_WARP_GATE, me);
+                }
+                break;
+        }
+    }
+
+    void UpdateAI(const uint32 uiDiff)
+    {
+        npc_escortAI::UpdateAI(uiDiff);
+
+        if (SummonImp)
+        {
+            if (StartSpawnTimer <= uiDiff) 
+            {
+                if (SpawnTimer <= uiDiff)
+                {
+                    if (Count >= MAX_IMP)
+                    {
+                        DoScriptText(SAY_DR_3, me);
+                        SummonImp = false;
+                        StartSpawnTimer = 15000;
+                    }
+                    SpawnTimer = 3500;
+                    SpawnImp();
+                }
+                else SpawnTimer -= uiDiff;
+            }
+            else StartSpawnTimer -= uiDiff;
+        }
+
+        if (SummonTrooper)
+        {
+            if (StartSpawnTimer <= uiDiff)
+            {
+                if (SpawnTimer <= uiDiff)
+                {
+                    if (Count >= MAX_TROOPER)
+                    {
+                        SummonTrooper = false;
+                        StartSpawnTimer = 15000;
+                    }
+                     SpawnTimer = 3500;
+                     SpawnTrooper();
+                }
+                else SpawnTimer -= uiDiff;
+            }
+            else StartSpawnTimer -= uiDiff;
+        }
+
+        if (SummonDestroyer)
+        {
+            if (StartSpawnTimer <= uiDiff)
+            {
+                SpawnDestroyer();
+                SummonDestroyer = false;
+                StartSpawnTimer = 15000;
+            }
+            else StartSpawnTimer -= uiDiff;
+        }
+
+        if (Destroy)
+        {
+            if (DestroyingTimer <= uiDiff)
+            {
+                SetEscortPaused(false);
+                Destroy = false;
+                DestroyingTimer = 60000;
+            }
+            else DestroyingTimer -= uiDiff;
+
+            me->HandleEmoteCommand(173);
+        }
+
+        DoMeleeAttackIfReady();
+    }
+};
+
+CreatureAI* GetAI_npc_drijya(Creature* pCreature)
+{
+    return new npc_drijyaAI(pCreature);
+}
+
+bool QuestAccept_npc_drijya(Player* pPlayer, Creature* pCreature, const Quest* pQuest)
+{
+    if (pQuest->GetQuestId() == QUEST_WARP_GATE)
+    {
+        if (npc_drijyaAI* pEscortAI = dynamic_cast<npc_drijyaAI*>(pCreature->AI()))
+        {
+            pCreature->setFaction(113);
+            pEscortAI->Start(true, false, pPlayer->GetGUID(), pQuest);
+        }
+    }
+    return true;
+}
+
 void AddSC_netherstorm()
 {
     Script *newscript;
@@ -1054,6 +1498,27 @@ void AddSC_netherstorm()
     newscript->Name = "npc_maxx_a_million_escort";
     newscript->GetAI = &GetAI_npc_maxx_a_million_escort;
     newscript->pQuestAccept = &QuestAccept_npc_maxx_a_million_escort;
+    newscript->RegisterSelf();
+
+    newscript = new Script;
+    newscript->Name = "npc_zeppit";
+    newscript->GetAI = &GetAI_npc_zeppit;
+    newscript->RegisterSelf();
+
+    newscript = new Script;
+    newscript->Name = "npc_dr_boom";
+    newscript->GetAI = &GetAI_npc_dr_boom;
+    newscript->RegisterSelf();
+
+    newscript = new Script;
+    newscript->Name = "npc_boom_bot";
+    newscript->GetAI = &GetAI_npc_boom_bot;
+    newscript->RegisterSelf();
+
+    newscript = new Script;
+    newscript->Name = "npc_drijya";
+    newscript->GetAI = &GetAI_npc_drijya;
+    newscript->pQuestAccept = &QuestAccept_npc_drijya;
     newscript->RegisterSelf();
 }
 

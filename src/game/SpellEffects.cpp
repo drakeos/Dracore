@@ -1,23 +1,20 @@
 /*
- * Copyright (C) 2005-2008 MaNGOS <http://www.mangosproject.org/>
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
- * Copyright (C) 2008 Trinity <http://www.trinitycore.org/>
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * Copyright (C) 2010 Oregon <http://www.oregoncore.com/>
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "Common.h"
@@ -107,7 +104,7 @@ pEffect SpellEffects[TOTAL_SPELL_EFFECTS]=
     &Spell::EffectUnused,                                   // 39 SPELL_EFFECT_LANGUAGE
     &Spell::EffectDualWield,                                // 40 SPELL_EFFECT_DUAL_WIELD
     &Spell::EffectUnused,                                   // 41 SPELL_EFFECT_41 (old SPELL_EFFECT_SUMMON_WILD)
-    &Spell::EffectUnused,                                   // 42 SPELL_EFFECT_42 (old SPELL_EFFECT_SUMMON_GUARDIAN)
+    &Spell::SummonClassPet,                                 // 42 SPELL_EFFECT_SUMMON_CLASS_PET
     &Spell::EffectTeleUnitsFaceCaster,                      // 43 SPELL_EFFECT_TELEPORT_UNITS_FACE_CASTER
     &Spell::EffectLearnSkill,                               // 44 SPELL_EFFECT_SKILL_STEP
     &Spell::EffectAddHonor,                                 // 45 SPELL_EFFECT_ADD_HONOR                honor/pvp related
@@ -3291,33 +3288,22 @@ void Spell::EffectSummonType(uint32 i)
     Position pos;
     GetSummonPosition(i, pos);
 
-    /*//totem must be at same Z in case swimming caster and etc.
-        if (fabs(z - m_caster->GetPositionZ()) > 5)
-            z = m_caster->GetPositionZ();
-
-    uint32 level = m_caster->getLevel();
-
-    // level of creature summoned using engineering item based at engineering skill level
-    if (m_caster->GetTypeId() == TYPEID_PLAYER && m_CastItem)
-    {
-        ItemPrototype const *proto = m_CastItem->GetProto();
-        if (proto && proto->RequiredSkill == SKILL_ENGINERING)
-        {
-            uint16 skill202 = m_caster->ToPlayer()->GetSkillValue(SKILL_ENGINERING);
-            if (skill202)
-                level = skill202/5;
-        }
-    }*/
-
     TempSummon *summon = NULL;
 
     switch (properties->Category)
     {
-        default:
+        case SUMMON_CATEGORY_WILD:
+        case SUMMON_CATEGORY_ALLY:
+            if (properties->Flags & 512)
+            {
+                SummonGuardian(i, entry, properties);
+                break;
+            }
             switch (properties->Type)
             {
                 case SUMMON_TYPE_PET:
                 case SUMMON_TYPE_GUARDIAN:
+                case SUMMON_TYPE_GUARDIAN2:
                 case SUMMON_TYPE_MINION:
                     SummonGuardian(i, entry, properties);
                     break;
@@ -3327,24 +3313,10 @@ void Spell::EffectSummonType(uint32 i)
                     if (!summon || !summon->isTotem())
                         return;
 
-                    summon->SetUInt32Value(UNIT_CREATED_BY_SPELL, m_spellInfo->Id);
-
-                    if (damage)                                             // if not spell info, DB values used
+                    if (damage)                                            // if not spell info, DB values used
                     {
                         summon->SetMaxHealth(damage);
                         summon->SetHealth(damage);
-                    }
-
-                    if (m_originalCaster->GetTypeId() == TYPEID_PLAYER
-                        && properties->Slot >= SUMMON_SLOT_TOTEM
-                        && properties->Slot < MAX_TOTEM_SLOT)
-                    {
-                        WorldPacket data(SMSG_TOTEM_CREATED, 1+8+4+4);
-                        data << uint8(properties->Slot-1);
-                        data << uint64(m_originalCaster->GetGUID());
-                        data << uint32(duration);
-                        data << uint32(m_spellInfo->Id);
-                        m_originalCaster->ToPlayer()->SendDirectMessage(&data);
                     }
                     break;
                 }
@@ -3354,59 +3326,62 @@ void Spell::EffectSummonType(uint32 i)
                     if (!summon || !summon->HasSummonMask(SUMMON_MASK_MINION))
                         return;
 
-                    //summon->InitPetCreateSpells();                         // e.g. disgusting oozeling has a create spell as summon...
-                    summon->SetMaxHealth(1);
-                    summon->SetHealth(1);
-                    summon->SetLevel(1);
+                    summon->SelectLevel(summon->GetCreatureInfo());       // some summoned creaters have different from 1 DB data for level/hp
+                    summon->SetUInt32Value(UNIT_NPC_FLAGS, summon->GetCreatureInfo()->npcflag);
 
-                    summon->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+                    summon->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_OOC_NOT_ATTACKABLE | UNIT_FLAG_PASSIVE);
 
                     summon->AI()->EnterEvadeMode();
-
-                    std::string name = m_originalCaster->GetName();
-                    name.append(petTypeSuffix[3]);
-                    summon->SetName(name);
                     break;
                 }
                 default:
                 {
-                    // those are classical totems - effectbasepoints is their hp and not summon ammount!
-                    //SUMMON_TYPE_TOTEM = 121: 23035, battlestands
-                    if (prop_id == 121)
-                    {
-                        summon = m_caster->GetMap()->SummonCreature(entry, pos, properties, duration, m_originalCaster);
+                    float radius = GetSpellRadius(m_spellInfo, i, false);
 
-                        if (damage)                                             // if not spell info, DB values used
+                    uint32 amount = damage > 0 ? damage : 1;
+                    if (m_spellInfo->Id == 18662 || // Curse of Doom
+                        properties->Id == 2081 || m_spellInfo->Id == 43302)     // Mechanical Dragonling, Arcanite Dragonling, Mithril Dragonling, Halazzi's Lighting Totem
+                        amount = 1;
+
+                    TempSummonType summonType = (duration == 0) ? TEMPSUMMON_DEAD_DESPAWN : TEMPSUMMON_TIMED_DESPAWN;
+
+                    for (uint32 count = 0; count < amount; ++count)
+                    {
+                        GetSummonPosition(i, pos, radius, count);
+
+                        summon = m_originalCaster->SummonCreature(entry, pos, summonType, duration);
+                        if (!summon)
+                            continue;
+
+                        if (properties->Category == SUMMON_CATEGORY_ALLY)
                         {
-                            summon->SetMaxHealth(damage);
-                            summon->SetHealth(damage);
+                            summon->SetUInt64Value(UNIT_FIELD_SUMMONEDBY, m_originalCaster->GetGUID());
+                            summon->setFaction(m_originalCaster->getFaction());
+                            summon->SetUInt32Value(UNIT_CREATED_BY_SPELL, m_spellInfo->Id);
                         }
                     }
-                    else
-                    {
-                        float radius = GetSpellRadius(m_spellInfo, i, false);
-
-                        int32 amount = damage > 0 ? damage : 1;
-
-                        for (uint32 count = 0; count < amount; ++count)
-                        {
-                            GetSummonPosition(i, pos, radius, count);
-
-                            TempSummonType summonType = (duration == 0) ? TEMPSUMMON_DEAD_DESPAWN : TEMPSUMMON_TIMED_DESPAWN;
-
-                            m_originalCaster->SummonCreature(entry, pos, summonType, duration);
-                        }
-                    }
-                    break;
+                    return;
                 }
             }
             break;
         case SUMMON_CATEGORY_PET:
-            SummonGuardian(i, entry, properties);
+            SummonClassPet(i);
             break;
         case SUMMON_CATEGORY_PUPPET:
             summon = m_caster->GetMap()->SummonCreature(entry, pos, properties, duration, m_originalCaster);
             break;
+
+            uint32 faction = properties->Faction;
+            if (!faction)
+                faction = m_originalCaster->getFaction();
+
+            summon->setFaction(faction);
+            break;
+    }
+
+    if (summon)
+    {
+        summon->SetCreatorGUID(m_originalCaster->GetGUID());
     }
 }
 
@@ -4028,6 +4003,115 @@ void Spell::EffectSummonPet(uint32 i)
     std::string new_name=objmgr.GeneratePetName(petentry);
     if (!new_name.empty())
         pet->SetName(new_name);
+}
+
+void Spell::SummonClassPet(uint32 i)
+{
+    uint32 pet_entry = m_spellInfo->EffectMiscValue[i];
+    if (!pet_entry)
+        return;
+
+    Player *caster = NULL;
+    if (m_originalCaster)
+    {
+        if (m_originalCaster->GetTypeId() == TYPEID_PLAYER)
+            caster = m_originalCaster->ToPlayer();
+        else if (m_originalCaster->ToCreature()->isTotem())
+            caster = m_originalCaster->GetCharmerOrOwnerPlayerOrPlayerItself();
+    }
+
+    uint32 petentry = m_spellInfo->EffectMiscValue[i];
+
+    if (!caster)
+    {
+        SummonPropertiesEntry const *properties = sSummonPropertiesStore.LookupEntry(67);
+        if (properties)
+            SummonGuardian(i, petentry, properties);
+        return;
+    }
+
+    // set timer for unsummon
+    int32 duration = GetSpellDuration(m_spellInfo);
+
+    Pet *OldSummon = caster->GetPet();
+
+    // if pet requested type already exist
+    if (OldSummon)
+    {
+        if (petentry == 0 || OldSummon->GetEntry() == petentry)
+        {
+            // pet in corpse state can't be summoned
+            if (OldSummon->isDead())
+                return;
+
+            ASSERT(OldSummon->GetMap() == caster->GetMap());
+
+            float px, py, pz;
+            caster->GetClosePoint(px, py, pz, OldSummon->GetObjectSize());
+
+            OldSummon->NearTeleportTo(px, py, pz, OldSummon->GetOrientation());
+
+            if (caster->GetTypeId() == TYPEID_PLAYER && OldSummon->isControlled())
+                caster->ToPlayer()->PetSpellInitialize();
+
+            return;
+        }
+
+        if (caster->GetTypeId() == TYPEID_PLAYER)
+            caster->ToPlayer()->RemovePet(OldSummon, PET_SAVE_AS_DELETED, false);
+        else
+            return;
+    }
+
+    // in another case summon new
+    uint32 level = caster->getLevel();
+
+    // level of pet summoned using engineering item based at engineering skill level
+    if (m_CastItem)
+    {
+        ItemPrototype const *proto = m_CastItem->GetProto();
+        if (proto && proto->RequiredSkill == SKILL_ENGINERING)
+        {
+            uint16 skill202 = caster->GetSkillValue(SKILL_ENGINERING);
+            if (skill202)
+            {
+                level = skill202 / 5;
+            }
+        }
+    }
+
+    // select center of summon position
+    WorldLocation center = m_targets.m_dstPos;
+
+    float radius = GetSpellRadius(m_spellInfo,i,false);
+
+    int32 amount = damage > 0 ? damage : 1;
+
+    for (int32 count = 0; count < amount; ++count)
+    {
+        float px, py, pz;
+        // If dest location if present
+        if (m_targets.m_targetMask & TARGET_FLAG_DEST_LOCATION)
+        {
+            // Summon 1 unit in dest location
+            if (count == 0)
+                m_targets.m_dstPos.GetPosition(px, py, pz);
+            // Summon in random point all other units if location present
+            else
+                m_caster->GetRandomPoint(center, radius, px, py, pz);
+        }
+        // Summon if dest location not present near caster
+        else
+            m_caster->GetClosePoint(px,py,pz,m_caster->GetObjectSize());
+
+        Pet *pet = caster->SummonPet(m_spellInfo->EffectMiscValue[i], px, py, pz, m_caster->GetOrientation(), CLASS_PET, duration);
+        if (!pet)
+            return;
+
+        pet->SetUInt32Value(UNIT_FIELD_PET_NAME_TIMESTAMP,0);
+        pet->SetUInt32Value(UNIT_CREATED_BY_SPELL, m_spellInfo->Id);
+        pet->SetFlag(UNIT_FIELD_FLAGS,UNIT_FLAG_PVP_ATTACKABLE);
+    }
 }
 
 void Spell::EffectLearnPetSpell(uint32 i)
@@ -5801,9 +5885,11 @@ void Spell::EffectCharge(uint32 /*i*/)
     if (!target)
         return;
 
-    float x, y, z;
-    target->GetContactPoint(m_caster, x, y, z);
-    m_caster->GetMotionMaster()->MoveCharge(x, y, z);
+    float angle = target->GetAngle(m_caster) - target->GetOrientation();
+    Position pos;
+    target->GetContactPoint(m_caster, pos.m_positionX, pos.m_positionY, pos.m_positionZ);
+    target->GetFirstCollisionPosition(pos, target->GetObjectSize(), angle);
+    m_caster->GetMotionMaster()->MoveCharge(pos.m_positionX, pos.m_positionY, pos.m_positionZ + target->GetObjectSize());
 
     // not all charge effects used in negative spells
     if (!IsPositiveSpell(m_spellInfo->Id) && m_caster->GetTypeId() == TYPEID_PLAYER)
@@ -6405,7 +6491,7 @@ void Spell::SummonGuardian(uint32 i, uint32 entry, SummonPropertiesEntry const *
         return;
 
     // in another case summon new
-    uint32 level = caster->getLevel();
+    uint8 level = caster->getLevel();
 
     // level of pet summoned using engineering item based at engineering skill level
     if (m_CastItem && caster->GetTypeId() == TYPEID_PLAYER)
@@ -6421,14 +6507,23 @@ void Spell::SummonGuardian(uint32 i, uint32 entry, SummonPropertiesEntry const *
         }
     }
 
-    //float radius = GetSpellRadius(m_spellInfo,i,false);
+    //float radius = GetSpellRadiusForFriend(sSpellRadiusStore.LookupEntry(m_spellInfo->EffectRadiusIndex[i]));
     float radius = 5.0f;
-    int32 amount = damage > 0 ? damage : 1;
+    uint32 amount = damage > 0 ? damage : 1;
     int32 duration = GetSpellDuration(m_spellInfo);
-    TempSummonType summonType = (duration == 0) ? TEMPSUMMON_DEAD_DESPAWN : TEMPSUMMON_TIMED_DESPAWN;
+    switch (m_spellInfo->Id)
+    {
+        case 1122: // Inferno
+            amount = 1;
+            break;
+    }
+    if (Player *modOwner = m_originalCaster->GetSpellModOwner())
+        modOwner->ApplySpellMod(m_spellInfo->Id, SPELLMOD_DURATION, duration);
+
+    //TempSummonType summonType = (duration == 0) ? TEMPSUMMON_DEAD_DESPAWN : TEMPSUMMON_TIMED_DESPAWN;
     Map *map = caster->GetMap();
 
-    for (int32 count = 0; count < amount; ++count)
+    for (uint32 count = 0; count < amount; ++count)
     {
         Position pos;
         GetSummonPosition(i, pos, radius, count);
@@ -6436,13 +6531,16 @@ void Spell::SummonGuardian(uint32 i, uint32 entry, SummonPropertiesEntry const *
         TempSummon *summon = map->SummonCreature(entry, pos, properties, duration, caster);
         if (!summon)
             return;
-
         if (summon->HasSummonMask(SUMMON_MASK_GUARDIAN))
             ((Guardian*)summon)->InitStatsForLevel(level);
 
-        summon->SetUInt32Value(UNIT_CREATED_BY_SPELL, m_spellInfo->Id);
-        summon->SetFlag(UNIT_FIELD_FLAGS,UNIT_FLAG_PVP_ATTACKABLE);
+        if (properties && properties->Category == SUMMON_CATEGORY_ALLY)
+            summon->setFaction(caster->getFaction());
 
+        if (summon->HasSummonMask(SUMMON_MASK_MINION) && m_targets.HasDst())
+            ((Minion*)summon)->SetFollowAngle(m_caster->GetAngle(summon));
+
+        summon->SetUInt32Value(UNIT_CREATED_BY_SPELL, m_spellInfo->Id);
         summon->AI()->EnterEvadeMode();
     }
 }

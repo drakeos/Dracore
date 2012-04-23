@@ -1,9 +1,7 @@
 /*
- * Copyright (C) 2005-2010 MaNGOS <http://getmangos.com/>
- *
- * Copyright (C) 2008-2010 TrinityCore <http://www.trinitycore.org/>
- *
- * Copyright (C) 2010 Oregon <http://www.oregoncore.com/>
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -167,7 +165,7 @@ bool BigNumber::isZero() const
     return BN_is_zero(_bn)!=0;
 }
 
-uint8 *BigNumber::AsByteArray(int minSize)
+uint8 *BigNumber::AsByteArray(int minSize, bool reverse)
 {
     int length = (minSize >= GetNumBytes()) ? minSize : GetNumBytes();
 
@@ -184,7 +182,8 @@ uint8 *BigNumber::AsByteArray(int minSize)
 
     BN_bn2bin(_bn, (unsigned char *)_array);
 
-    std::reverse(_array, _array + length);
+    if(reverse)
+        std::reverse(_array, _array + length);
 
     return _array;
 }
@@ -213,4 +212,3 @@ const char *BigNumber::AsDecStr()
 {
     return BN_bn2dec(_bn);
 }
-

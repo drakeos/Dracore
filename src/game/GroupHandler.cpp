@@ -1,23 +1,20 @@
 /*
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
- * Copyright (C) 2008-2009 Trinity <http://www.trinitycore.org/>
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * Copyright (C) 2010 Oregon <http://www.oregoncore.com/>
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "Common.h"
@@ -60,12 +57,6 @@ void WorldSession::HandleGroupInviteOpcode(WorldPacket & recv_data)
 {
     std::string membername;
     recv_data >> membername;
-
-    if (_player->InBattleGround())
-    {
-        SendPartyResult(PARTY_OP_INVITE, membername, PARTY_RESULT_INVITE_RESTRICTED);
-        return;
-    }
 
     // attempt add selected player
 
@@ -115,14 +106,20 @@ void WorldSession::HandleGroupInviteOpcode(WorldPacket & recv_data)
         return;
     }
 
+    Group *group = GetPlayer()->GetGroup();
+    if (group && group->isBGGroup())
+        group = GetPlayer()->GetOriginalGroup();
+
+    Group *group2 = player->GetGroup();
+    if (group2 && group2->isBGGroup())
+        group2 = player->GetOriginalGroup();
+
     // player already in another group or invited
-    if (player->GetGroup() || player->GetGroupInvite())
+    if (group2 || player->GetGroupInvite())
     {
         SendPartyResult(PARTY_OP_INVITE, membername, PARTY_RESULT_ALREADY_IN_GROUP);
         return;
     }
-
-    Group *group = GetPlayer()->GetGroup();
 
     if (group)
     {
@@ -201,12 +198,6 @@ void WorldSession::HandleGroupAcceptOpcode(WorldPacket & /*recv_data*/)
 
     Player* leader = objmgr.GetPlayer(group->GetLeaderGUID());
 
-    if (leader && leader->InBattleGround())
-    {
-        SendPartyResult(PARTY_OP_INVITE, "", PARTY_RESULT_INVITE_RESTRICTED);
-        return;
-    }
-
     // forming a new group, create it
     if (!group->IsCreated())
     {
@@ -216,13 +207,9 @@ void WorldSession::HandleGroupAcceptOpcode(WorldPacket & /*recv_data*/)
         objmgr.AddGroup(group);
     }
 
-    // everything's fine, do it
+    // everything's fine, do it, PLAYER'S GROUP IS SET IN ADDMEMBER!!!
     if (!group->AddMember(GetPlayer()->GetGUID(), GetPlayer()->GetName()))
         return;
-
-    uint8 subgroup = group->GetMemberGroup(GetPlayer()->GetGUID());
-
-    GetPlayer()->SetGroup(group, subgroup);
 
     group->BroadcastGroupUpdate();
 }
@@ -431,7 +418,7 @@ void WorldSession::HandleMinimapPingOpcode(WorldPacket& recv_data)
     data << GetPlayer()->GetGUID();
     data << x;
     data << y;
-    GetPlayer()->GetGroup()->BroadcastPacket(&data, -1, GetPlayer()->GetGUID());
+    GetPlayer()->GetGroup()->BroadcastPacket(&data, true, -1, GetPlayer()->GetGUID());
 }
 
 void WorldSession::HandleRandomRollOpcode(WorldPacket& recv_data)
@@ -456,7 +443,7 @@ void WorldSession::HandleRandomRollOpcode(WorldPacket& recv_data)
     data << roll;
     data << GetPlayer()->GetGUID();
     if (GetPlayer()->GetGroup())
-        GetPlayer()->GetGroup()->BroadcastPacket(&data);
+        GetPlayer()->GetGroup()->BroadcastPacket(&data, false);
     else
         SendPacket(&data);
 }
@@ -598,7 +585,7 @@ void WorldSession::HandleRaidReadyCheckOpcode(WorldPacket & recv_data)
         // everything's fine, do it
         WorldPacket data(MSG_RAID_READY_CHECK, 8);
         data << GetPlayer()->GetGUID();
-        group->BroadcastPacket(&data, -1);
+        group->BroadcastPacket(&data, false, -1);
 
         group->OfflineReadyCheck();
     }

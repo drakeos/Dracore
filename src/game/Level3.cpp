@@ -1,21 +1,20 @@
 /*
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2005-2012 MaNGOS <http://getmangos.com/>
  *
- * Copyright (C) 2008-2009 Trinity <http://www.trinitycore.org/>
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "Common.h"
@@ -53,6 +52,7 @@
 #include "InstanceSaveMgr.h"
 #include "InstanceData.h"
 #include "AuctionHouseBot.h"
+#include "CreatureEventAIMgr.h"
 
 bool ChatHandler::HandleAHBotOptionsCommand(const char *args)
 {
@@ -1064,6 +1064,31 @@ bool ChatHandler::HandleReloadEventScriptsCommand(const char* arg)
     return true;
 }
 
+bool ChatHandler::HandleReloadEventAITextsCommand(const char* /*args*/)
+{
+
+    sLog.outString("Re-Loading Texts from `creature_ai_texts`...");
+    CreatureEAI_Mgr.LoadCreatureEventAI_Texts(true);
+    SendGlobalSysMessage("DB table `creature_ai_texts` reloaded.");
+    return true;
+}
+
+bool ChatHandler::HandleReloadEventAISummonsCommand(const char* /*args*/)
+{
+    sLog.outString("Re-Loading Summons from `creature_ai_summons`...");
+    CreatureEAI_Mgr.LoadCreatureEventAI_Summons(true);
+    SendGlobalSysMessage("DB table `creature_ai_summons` reloaded.");
+    return true;
+}
+
+bool ChatHandler::HandleReloadEventAIScriptsCommand(const char* /*args*/)
+{
+    sLog.outString("Re-Loading Scripts from `creature_ai_scripts`...");
+    CreatureEAI_Mgr.LoadCreatureEventAI_Scripts();
+    SendGlobalSysMessage("DB table `creature_ai_scripts` reloaded.");
+    return true;
+}
+
 bool ChatHandler::HandleReloadWpScriptsCommand(const char* arg)
 {
     if (sWorld.IsScriptScheduled())
@@ -1237,8 +1262,8 @@ bool ChatHandler::HandleReloadAuctionsCommand(const char *args)
 {
     // Reload dynamic data tables from the database
     sLog.outString("Re-Loading Auctions...");
-    auctionmgr.LoadAuctionItems();
-    auctionmgr.LoadAuctions();
+    sAuctionMgr->LoadAuctionItems();
+    sAuctionMgr->LoadAuctions();
     SendGlobalGMSysMessage("Auctions reloaded.");
     return true;
 }
@@ -1259,7 +1284,7 @@ bool ChatHandler::HandleAccountSetGmLevelCommand(const char *args)
     if (getSelectedPlayer() && arg1 && !arg3)
     {
         targetAccountId = getSelectedPlayer()->GetSession()->GetAccountId();
-        accmgr.GetName(targetAccountId, targetAccountName);
+        sAccountMgr->GetName(targetAccountId, targetAccountName);
         Player* targetPlayer = getSelectedPlayer();
         gm = atoi(arg1);
         uint32 gmRealmID = arg2 ? atoi(arg2) : realmID;
@@ -1321,7 +1346,7 @@ bool ChatHandler::HandleAccountSetGmLevelCommand(const char *args)
         }
 
         // Check for username not exist
-        targetAccountId = accmgr.GetId(targetAccountName);
+        targetAccountId = sAccountMgr->GetId(targetAccountName);
         if (!targetAccountId)
         {
             PSendSysMessage(LANG_ACCOUNT_NOT_EXIST,targetAccountName.c_str());
@@ -1347,13 +1372,13 @@ bool ChatHandler::HandleAccountSetGmLevelCommand(const char *args)
             return false;
         }
 
-        targetAccountId = accmgr.GetId(arg1);
+        targetAccountId = sAccountMgr->GetId(arg1);
         // m_session == NULL only for console
         uint32 plSecurity = m_session ? m_session->GetSecurity() : SEC_CONSOLE;
 
         // can set security level only for target with less security and to less security that we have
         // This is also reject self apply in fact
-        targetSecurity = accmgr.GetSecurity(targetAccountId);
+        targetSecurity = sAccountMgr->GetSecurity(targetAccountId);
         if (targetSecurity >= plSecurity || gm >= plSecurity)
         {
             SendSysMessage(LANG_YOURS_SECURITY_IS_LOW);
@@ -1398,7 +1423,7 @@ bool ChatHandler::HandleAccountSetPasswordCommand(const char *args)
         return false;
     }
 
-    uint32 targetAccountId = accmgr.GetId(account_name);
+    uint32 targetAccountId = sAccountMgr->GetId(account_name);
     if (!targetAccountId)
     {
         PSendSysMessage(LANG_ACCOUNT_NOT_EXIST,account_name.c_str());
@@ -1406,7 +1431,7 @@ bool ChatHandler::HandleAccountSetPasswordCommand(const char *args)
         return false;
     }
 
-    uint32 targetSecurity = accmgr.GetSecurity(targetAccountId);
+    uint32 targetSecurity = sAccountMgr->GetSecurity(targetAccountId);
 
     // m_session == NULL only for console
     uint32 plSecurity = m_session ? m_session->GetSecurity() : SEC_CONSOLE;
@@ -1427,7 +1452,7 @@ bool ChatHandler::HandleAccountSetPasswordCommand(const char *args)
         return false;
     }
 
-    AccountOpResult result = accmgr.ChangePassword(targetAccountId, szPassword1);
+    AccountOpResult result = sAccountMgr->ChangePassword(targetAccountId, szPassword1);
 
     switch (result)
     {
@@ -5750,7 +5775,7 @@ bool ChatHandler::HandleBanInfoAccountCommand(const char *args)
         return false;
     }
 
-    uint32 accountid = accmgr.GetId(account_name);
+    uint32 accountid = sAccountMgr->GetId(account_name);
     if (!accountid)
     {
         PSendSysMessage(LANG_ACCOUNT_NOT_EXIST,account_name.c_str());
@@ -5786,7 +5811,7 @@ bool ChatHandler::HandleBanInfoCharacterCommand(const char *args)
     }
 
     std::string accountname;
-    if (!accmgr.GetName(accountid,accountname))
+    if (!sAccountMgr->GetName(accountid,accountname))
     {
         PSendSysMessage(LANG_BANINFO_NOCHARACTER);
         return true;
@@ -5943,7 +5968,7 @@ bool ChatHandler::HandleBanListHelper(QueryResult_AutoPtr result)
                 account_name = fields[1].GetCppString();
             // "character" case, name need extract from another DB
             else
-                accmgr.GetName (account_id,account_name);
+                sAccountMgr->GetName (account_id,account_name);
 
             // No SQL injection. id is uint32.
             QueryResult_AutoPtr banInfo = LoginDatabase.PQuery("SELECT bandate,unbandate,bannedby,banreason FROM account_banned WHERE id = %u ORDER BY unbandate", account_id);
@@ -6132,7 +6157,7 @@ bool ChatHandler::HandleLoadPDumpCommand(const char *args)
         return false;
     }
 
-    uint32 account_id = accmgr.GetId(account_name);
+    uint32 account_id = sAccountMgr->GetId(account_name);
     if (!account_id)
     {
         account_id = atoi(account);                             // use original string
@@ -6144,7 +6169,7 @@ bool ChatHandler::HandleLoadPDumpCommand(const char *args)
         }
     }
 
-    if (!accmgr.GetName(account_id,account_name))
+    if (!sAccountMgr->GetName(account_id,account_name))
     {
         PSendSysMessage(LANG_ACCOUNT_NOT_EXIST,account_name.c_str());
         SetSentErrorMessage(true);
@@ -6827,7 +6852,7 @@ bool ChatHandler::HandleAccountSetAddonCommand(const char *args)
             return false;
 
         account_id = player->GetSession()->GetAccountId();
-        accmgr.GetName(account_id,account_name);
+        sAccountMgr->GetName(account_id,account_name);
         szExp = szAcc;
     }
     else
@@ -6841,7 +6866,7 @@ bool ChatHandler::HandleAccountSetAddonCommand(const char *args)
             return false;
         }
 
-        account_id = accmgr.GetId(account_name);
+        account_id = sAccountMgr->GetId(account_name);
         if (!account_id)
         {
             PSendSysMessage(LANG_ACCOUNT_NOT_EXIST,account_name.c_str());

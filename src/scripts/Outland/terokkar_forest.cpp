@@ -1,17 +1,20 @@
-/* Copyright (C) 2006 - 2008 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+/*
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2006-2012 ScriptDev2 <http://www.scriptdev2.com/>
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 /* ScriptData
@@ -795,18 +798,7 @@ struct npc_letollAI : public npc_escortAI
 
         m_lResearchersList.clear();
 
-        float x, y, z;
-        me->GetPosition(x, y, z);
-
-        CellPair pair(Oregon::ComputeCellPair(x, y));
-        Cell cell(pair);
-        cell.data.Part.reserved = ALL_DISTRICT;
-        cell.SetNoCreate();
-
-        Oregon::AllCreaturesOfEntryInRange check(me, NPC_RESEARCHER, 25);
-        Oregon::CreatureListSearcher<Oregon::AllCreaturesOfEntryInRange> searcher(m_lResearchersList, check);
-        TypeContainerVisitor<Oregon::CreatureListSearcher<Oregon::AllCreaturesOfEntryInRange>, GridTypeMapContainer> cSearcher(searcher);
-        cell.Visit(pair, cSearcher, *(me->GetMap()));
+        me->GetCreatureListWithEntryInGrid(m_lResearchersList, NPC_RESEARCHER, 25.0f);
 
         if (!m_lResearchersList.empty())
             SetFormation();
@@ -817,6 +809,11 @@ struct npc_letollAI : public npc_escortAI
         switch(uiPointId)
         {
             case 0:
+                JustStartedEscort();
+                for (std::list<Creature*>::iterator itr = m_lResearchersList.begin(); itr != m_lResearchersList.end(); ++itr)
+                {
+                    (*itr)->SetUnitMovementFlags(MOVEFLAG_WALK_MODE);
+                }
                 if (Player* pPlayer = GetPlayerForEscort())
                     DoScriptText(SAY_LE_KEEP_SAFE, me, pPlayer);
                 break;
@@ -832,6 +829,10 @@ struct npc_letollAI : public npc_escortAI
                 break;
             case 13:
                 SetRun();
+                for (std::list<Creature*>::iterator itr = m_lResearchersList.begin(); itr != m_lResearchersList.end(); ++itr)
+                {
+                    (*itr)->SetUnitMovementFlags(MOVEFLAG_NONE);
+                }
                 break;
         }
     }

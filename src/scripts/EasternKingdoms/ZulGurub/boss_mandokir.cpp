@@ -1,20 +1,20 @@
-/* Copyright (C) 2006 - 2008 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+/*
+ * Copyright (C) 2010-2012 OregonCore <http://www.oregoncore.com/>
+ * Copyright (C) 2008-2012 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2006-2012 ScriptDev2 <http://www.scriptdev2.com/>
  *
- * Copyright (C) 2011 Oregon <http://www.oregoncore.com/>
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 /* ScriptData
@@ -38,12 +38,12 @@ enum Texts
 
 enum Spells
 {
-    SPELL_CHARGE          = 24315,
-    SPELL_CLEAVE          = 20691,
+    SPELL_CHARGE          = 24408,
+    SPELL_CLEAVE          = 7160,
     SPELL_FEAR            = 29321,
-    SPELL_WHIRLWIND       = 24236,
-    SPELL_MORTAL_STRIKE   = 24573,
-    SPELL_ENRAGE          = 23537,
+    SPELL_WHIRLWIND       = 15589,
+    SPELL_MORTAL_STRIKE   = 16856,
+    SPELL_ENRAGE          = 24318,
     SPELL_GAZE            = 24314,
     SPELL_LEVEL_UP        = 24312,
     SPELL_MOUNT           = 23243,
